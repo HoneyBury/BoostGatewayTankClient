@@ -169,6 +169,22 @@ int main(int argc, char* argv[]) {
                        ? battle_state.error_message
                        : battle_state.response_body);
 
+    bob.disconnect();
+    sdk::SdkClient bob_reconnected;
+    bob_reconnected.on_push(on_push);
+    const auto bob_reconnect_ok = bob_reconnected.connect(host, port, timeout);
+    const auto bob_relogin = bob_reconnected.login(bob_id, "token:" + bob_id, timeout);
+    const auto bob_resume = bob_reconnected.battle_state(start.battle_id, timeout);
+    const auto bob_resume_snapshot = bgtc::decodeTankSnapshot(bob_resume.response_body);
+    state.add_step("reconnect_battle_state_restore",
+                   bob_reconnect_ok && bob_relogin.ok && bob_resume.ok &&
+                       bob_resume_snapshot.has_value() &&
+                       bob_resume_snapshot->frame >= 1 &&
+                       bob_resume_snapshot->tanks.size() >= 2,
+                   bob_resume.response_body.empty()
+                       ? bob_resume.error_message
+                       : bob_resume.response_body);
+
     const auto finish = alice.send_battle_input(bgtc::encodeLegacyFinishInput("surrender"), timeout);
     state.add_step("finish_battle", finish.ok, finish.error_message);
     std::this_thread::sleep_for(250ms);
@@ -186,7 +202,7 @@ int main(int argc, char* argv[]) {
     state.add_step("leaderboard_top", leaderboard.ok, leaderboard.response_body);
 
     alice.leave_room(room_id, timeout);
-    bob.leave_room(room_id, timeout);
+    bob_reconnected.leave_room(room_id, timeout);
     alice.disconnect();
     bob.disconnect();
 

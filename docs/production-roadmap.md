@@ -140,7 +140,8 @@
 - P3 已有 heartbeat 启动、disconnect callback、菜单重连入口、重连次数诊断、
   `SessionResumedPush` / `SessionKickedPush` 处理和本地 room/battle 上下文弱恢复；
   room detail 已可用于大厅恢复辅助，battle state 查询已接入重连后的主动 snapshot
-  恢复。后续需要补真断线自动化场景和更细的恢复错误提示。
+  恢复；`tank_headless_gate` 已覆盖真断线、重连、重新登录和 snapshot 恢复。后续
+  需要补图形界面自动化场景和更细的恢复错误提示。
 - P4 已有排行榜页、结算摘要和回放页占位；排行榜 top/rank 走 SDK，战斗结束后
   会自动刷新最近一局结算和排行榜。回放查询等待 SDK API。
 - P5 已有道具 snapshot 模型和渲染占位，具体道具协议等待服务端协议稳定。
@@ -166,6 +167,6 @@
   scores，战斗结束后自动切到排行榜页并刷新展示。
 - P3 弱恢复：客户端可识别服务端 resumed/kicked push，重连后恢复本地 room/battle
   导航上下文，并通过服务端 SDK `battle_state` 查询恢复最新 authoritative snapshot；
-  后续要把该能力放入真断线 UI 自动化 gate。
+  真断线重连恢复已进入 live gate，后续要把该能力放入图形界面自动化 gate。
 - 自动化：`tank_protocol_smoke_test` 覆盖协议解析，`tank_ui_smoke_test` 覆盖离线
   Qt Widgets 构造和战斗快照渲染，`tank_headless_gate` 覆盖真实 gateway 业务闭环。
