@@ -199,6 +199,20 @@ bool GatewayClient::sendLegacyMoveInput(int x, int y, QString* errorMessage) {
     return true;
 }
 
+bool GatewayClient::sendAttackInput(const QString& targetUserId, QString* errorMessage) {
+    const auto result = client_->send_battle_input(encodeLegacyAttackInput(toStdString(targetUserId)), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "send attack failed");
+        return false;
+    }
+    ++diagnostics_.inputsSent;
+    publishDiagnostics();
+    return true;
+}
+
 bool GatewayClient::sendFinishInput(const QString& reason, QString* errorMessage) {
     const auto result = client_->send_battle_input(encodeLegacyFinishInput(reason.toStdString()), kDefaultTimeout);
     if (!result.ok) {

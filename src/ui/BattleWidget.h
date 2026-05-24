@@ -25,11 +25,17 @@ private:
     void sendMove(int dx, int dy);
     void sendFire(int direction);
     void drawPanel(QPainter& painter);
+    [[nodiscard]] const TankState* findLocalTank() const;
+    [[nodiscard]] QString findFirstOpponentUserId() const;
+    [[nodiscard]] QPoint tankToScreen(const TankState& tank) const;
 
     ClientSession& session_;
     GatewayClient& gateway_;
     TankSnapshot snapshot_;
     std::uint64_t nextSeq_ = 1;
+    int fallbackX_ = 0;
+    int fallbackY_ = 0;
+    QString lastInput_;
     QString lastInputError_;
 };
 

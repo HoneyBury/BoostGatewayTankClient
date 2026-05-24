@@ -4,6 +4,7 @@
 
 #include <QKeyEvent>
 #include <QPainter>
+#include <algorithm>
 
 namespace bgtc {
 namespace {
@@ -53,11 +54,12 @@ void BattleWidget::paintEvent(QPaintEvent*) {
     }
 
     for (const auto& tank : snapshot_.tanks) {
+        const auto screen = tankToScreen(tank);
         painter.setBrush(tank.userId == session_.userId.toStdString() ? QColor("#06d6a0") : QColor("#ef476f"));
         painter.setPen(QColor("#ffffff"));
-        painter.drawRoundedRect(tank.x * kCell + 4, tank.y * kCell + 4, kCell - 8, kCell - 8, 4, 4);
-        painter.drawText(tank.x * kCell + 4,
-                         tank.y * kCell + 18,
+        painter.drawRoundedRect(screen.x() + 4, screen.y() + 4, kCell - 8, kCell - 8, 4, 4);
+        painter.drawText(screen.x() + 4,
+                         screen.y() + 18,
                          QString::fromStdString(tank.userId.substr(0, 2)));
     }
 
@@ -100,19 +102,45 @@ void BattleWidget::keyPressEvent(QKeyEvent* event) {
 }
 
 void BattleWidget::sendMove(int dx, int dy) {
+    const auto* localTank = findLocalTank();
+    const int currentX = localTank ? localTank->x : fallbackX_;
+    const int currentY = localTank ? localTank->y : fallbackY_;
+    const int targetX = std::clamp(currentX + dx * kCell, 0, 1000);
+    const int targetY = std::clamp(currentY + dy * kCell, 0, 1000);
+
     QString error;
-    if (!gateway_.sendTankInput(makeMoveInput(nextSeq_++, dx, dy), &error)) {
+    if (!gateway_.sendLegacyMoveInput(targetX, targetY, &error)) {
         lastInputError_ = error;
         update();
+        return;
     }
+    ++nextSeq_;
+    fallbackX_ = targetX;
+    fallbackY_ = targetY;
+    lastInput_ = QString("move:%1,%2").arg(targetX).arg(targetY);
+    lastInputError_.clear();
+    update();
 }
 
 void BattleWidget::sendFire(int direction) {
+    (void)direction;
+    const auto targetUserId = findFirstOpponentUserId();
+    if (targetUserId.isEmpty()) {
+        lastInputError_ = "当前 snapshot 中没有可攻击目标";
+        update();
+        return;
+    }
+
     QString error;
-    if (!gateway_.sendTankInput(makeFireInput(nextSeq_++, direction), &error)) {
+    if (!gateway_.sendAttackInput(targetUserId, &error)) {
         lastInputError_ = error;
         update();
+        return;
     }
+    ++nextSeq_;
+    lastInput_ = "attack:" + targetUserId;
+    lastInputError_.clear();
+    update();
 }
 
 void BattleWidget::drawPanel(QPainter& painter) {
@@ -132,11 +160,40 @@ void BattleWidget::drawPanel(QPainter& painter) {
     painter.drawText(panelX, 265, "空格：向上开火");
     painter.drawText(panelX, 290, "F：结束战斗");
     painter.drawText(panelX, 325, "规则：以服务端 snapshot 为准");
+    if (!lastInput_.isEmpty()) {
+        painter.drawText(panelX, 350, "最近输入: " + lastInput_.left(24));
+    }
     if (!lastInputError_.isEmpty()) {
         painter.setPen(QColor("#ffb703"));
-        painter.drawText(panelX, 365, "最近输入错误:");
-        painter.drawText(panelX, 390, lastInputError_.left(28));
+        painter.drawText(panelX, 385, "最近输入错误:");
+        painter.drawText(panelX, 410, lastInputError_.left(28));
     }
+}
+
+const TankState* BattleWidget::findLocalTank() const {
+    const auto userId = session_.userId.toStdString();
+    for (const auto& tank : snapshot_.tanks) {
+        if (tank.userId == userId) {
+            return &tank;
+        }
+    }
+    return nullptr;
+}
+
+QString BattleWidget::findFirstOpponentUserId() const {
+    const auto userId = session_.userId.toStdString();
+    for (const auto& tank : snapshot_.tanks) {
+        if (tank.userId != userId && tank.alive) {
+            return QString::fromStdString(tank.userId);
+        }
+    }
+    return {};
+}
+
+QPoint BattleWidget::tankToScreen(const TankState& tank) const {
+    const int x = std::clamp(tank.x / kCell, 0, kMapWidth - 1) * kCell;
+    const int y = std::clamp(tank.y / kCell, 0, kMapHeight - 1) * kCell;
+    return QPoint(x, y);
 }
 
 }  // namespace bgtc

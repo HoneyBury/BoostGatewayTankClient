@@ -133,8 +133,9 @@
 - P1 已有登录、大厅、创建/加入/离开、ready/unready、排行榜查询入口；注册、
   房间列表、房间详情、踢人和转让房主仍等待服务端 SDK 暴露通用 API。
 - P2 已有战斗页、键盘输入、snapshot 渲染、子弹/道具预留和基础战斗指标；
-  已兼容当前服务端 `battle_state:kind=...` push，并保留未来 `tank.snapshot`
-  JSON 渲染路径。
+  已兼容当前服务端 `battle_state:kind=...`、`frame_advanced` 和
+  `battle_finished` push。Qt UI 的 WASD/方向键已切到真实服务端 `move:x,y`
+  输入，空格使用 `attack:user_id`，F 使用 `finish:reason`。
 - P3 已有 heartbeat 启动、disconnect callback、菜单重连入口和重连次数诊断；
   resume snapshot 的完整业务恢复还需要服务端/SDK API 明确。
 - P4 已有排行榜页和回放页占位；排行榜 top/rank 走 SDK，回放查询等待 SDK API。
@@ -149,9 +150,10 @@
 当前优先级 1/2/3 的客户端侧已经完成一轮可验证收束：
 
 - 房间链路：现有 SDK 支持的 create/join/leave/ready/start 已接入 UI 和 headless gate。
-- 战斗联调：客户端可识别现有服务端 `battle_state` push，并能发送现有 SDK 主链
-  使用的 legacy `move:x,y` / `finish:reason` 输入。
-- 同屏升级路径：客户端仍保留 `tank.input` JSON 和 `tank.snapshot` JSON 模型，等待
-  服务端 demo snapshot 接入 gateway push 后即可切换到完整画面同步。
+- 战斗联调：客户端可识别现有服务端 `battle_state` 和 `frame_advanced`
+  push，并能发送现有 SDK 主链使用的 `move:x,y`、`attack:user_id` 和
+  `finish:reason` 输入。
+- 同屏画面：Qt UI 已能根据服务端 `participants[].pos_x/pos_y` 渲染玩家位置；
+  客户端仍保留 `tank.input` JSON 和 `tank.snapshot` JSON 模型，便于后续协议升级。
 - 自动化：`tank_protocol_smoke_test` 覆盖协议解析，`tank_headless_gate` 覆盖真实
   gateway 业务闭环。

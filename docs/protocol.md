@@ -7,6 +7,20 @@
 
 客户端通过 `SdkClient::send_battle_input()` 发送坦克输入。
 
+当前服务端主链已经验证的输入格式是：
+
+```text
+move:50,50
+attack:bob
+finish:surrender
+```
+
+Qt 战斗 UI 当前优先使用这组格式，确保可以直接接入真实 gateway/backend。
+其中 `move:x,y` 是服务端世界坐标，客户端会从最新 authoritative snapshot 推导
+下一步目标坐标；`attack:user_id` 会攻击当前快照中的目标玩家。
+
+客户端仍保留未来业务 JSON 输入模型：
+
 ```json
 {
   "seq": 42,
@@ -76,9 +90,24 @@ battle_state:kind=settlement:room_id=room_1:battle_id=battle_1:reason=surrender:
 battle_state:kind=finished:room_id=room_1:battle_id=battle_1:reason=surrender:user_id=alice
 ```
 
+当前 battle backend 也会推送带参与者状态的 JSON，例如：
+
+```json
+{
+  "battle_id": "battle_1",
+  "frame_number": 2,
+  "kind": "frame_advanced",
+  "participants": [
+    {"user_id": "alice", "pos_x": 50, "pos_y": 50, "hp": 100, "score": 0}
+  ],
+  "trigger": "input:alice:1"
+}
+```
+
 客户端当前同时支持：
 
 - 解析现有 `battle_state:*` push，用于真实联调 gate。
+- 解析现有 `frame_advanced` / `battle_finished` JSON push，用于 Qt 战斗画面渲染。
 - 解析未来 `tank.snapshot` JSON，用于同屏坦克渲染。
 
 这意味着 P2 的联调可以先基于现有主链完成，随后服务端补齐更丰富的

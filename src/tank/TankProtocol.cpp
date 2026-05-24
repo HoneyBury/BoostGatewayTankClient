@@ -12,8 +12,8 @@ using json = nlohmann::json;
 TankState parseTank(const json& value) {
     TankState tank;
     tank.userId = value.value("user_id", "");
-    tank.x = value.value("x", 0);
-    tank.y = value.value("y", 0);
+    tank.x = value.value("x", value.value("pos_x", 0));
+    tank.y = value.value("y", value.value("pos_y", 0));
     tank.hp = value.value("hp", 100);
     tank.direction = value.value("direction", 0);
     tank.alive = value.value("alive", true);
@@ -118,22 +118,25 @@ std::string encodeLegacyMoveInput(int x, int y) {
     return "move:" + std::to_string(x) + "," + std::to_string(y);
 }
 
+std::string encodeLegacyAttackInput(const std::string& targetUserId) {
+    return "attack:" + targetUserId;
+}
+
 std::string encodeLegacyFinishInput(const std::string& reason) {
     return "finish:" + reason;
 }
 
 std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload) {
-    if (auto battleState = decodeBattleStateEvent(payload)) {
-        TankSnapshot snapshot;
-        snapshot.frame = battleState->frame;
-        snapshot.finished = battleState->kind == "finished" || battleState->kind == "settlement";
-        snapshot.finishReason = battleState->reason;
-        snapshot.battleState = *battleState;
-        return snapshot;
-    }
-
     auto doc = json::parse(payload, nullptr, false);
     if (doc.is_discarded() || !doc.is_object()) {
+        if (auto battleState = decodeBattleStateEvent(payload)) {
+            TankSnapshot snapshot;
+            snapshot.frame = battleState->frame;
+            snapshot.finished = battleState->kind == "finished" || battleState->kind == "settlement";
+            snapshot.finishReason = battleState->reason;
+            snapshot.battleState = *battleState;
+            return snapshot;
+        }
         return std::nullopt;
     }
 
@@ -141,19 +144,38 @@ std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload) {
         return decodeTankSnapshot(doc["payload"].get<std::string>());
     }
 
-    if (doc.value("type", "") != "tank.snapshot" && !doc.contains("tanks")) {
+    if (doc.value("type", "") != "tank.snapshot" && !doc.contains("tanks") &&
+        !doc.contains("participants") && doc.value("kind", "") != "battle_finished") {
         return std::nullopt;
     }
 
     TankSnapshot snapshot;
-    snapshot.frame = doc.value("frame", 0);
-    snapshot.finished = doc.value("finished", false);
-    snapshot.finishReason = doc.value("finish_reason", "");
+    snapshot.frame = doc.value("frame", doc.value("frame_number", 0));
+    const auto kind = doc.value("kind", "");
+    snapshot.finished = doc.value("finished", kind == "battle_finished" || kind == "finished" || kind == "settlement");
+    snapshot.finishReason = doc.value("finish_reason", doc.value("reason", ""));
     snapshot.winnerUserId = doc.value("winner_user_id", "");
+
+    if (!kind.empty()) {
+        BattleStateEvent event;
+        event.kind = kind;
+        event.roomId = doc.value("room_id", "");
+        event.battleId = doc.value("battle_id", "");
+        event.frame = snapshot.frame;
+        event.trigger = doc.value("trigger", "");
+        event.reason = snapshot.finishReason;
+        event.userId = doc.value("user_id", "");
+        snapshot.battleState = event;
+    }
 
     if (doc.contains("tanks") && doc["tanks"].is_array()) {
         for (const auto& tank : doc["tanks"]) {
             snapshot.tanks.push_back(parseTank(tank));
+        }
+    }
+    if (doc.contains("participants") && doc["participants"].is_array()) {
+        for (const auto& participant : doc["participants"]) {
+            snapshot.tanks.push_back(parseTank(participant));
         }
     }
     if (doc.contains("bullets") && doc["bullets"].is_array()) {
@@ -194,7 +216,7 @@ std::optional<BattleStateEvent> decodeBattleStateEvent(const std::string& payloa
     event.kind = kind;
     event.roomId = doc.value("room_id", "");
     event.battleId = doc.value("battle_id", "");
-    event.frame = doc.value("frame", 0);
+    event.frame = doc.value("frame", doc.value("frame_number", 0));
     event.trigger = doc.value("trigger", "");
     event.reason = doc.value("reason", "");
     event.userId = doc.value("user_id", "");

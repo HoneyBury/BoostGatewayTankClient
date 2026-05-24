@@ -28,6 +28,7 @@ struct TankInput {
 
 std::string encodeTankInput(const TankInput& input);
 std::string encodeLegacyMoveInput(int x, int y);
+std::string encodeLegacyAttackInput(const std::string& targetUserId);
 std::string encodeLegacyFinishInput(const std::string& reason);
 std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload);
 std::optional<BattleStateEvent> decodeBattleStateEvent(const std::string& payload);

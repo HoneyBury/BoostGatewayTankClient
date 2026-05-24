@@ -43,6 +43,7 @@ public:
     bool startBattle(const QString& roomId, QString* battleId, QString* errorMessage = nullptr);
     bool sendTankInput(const TankInput& input, QString* errorMessage = nullptr);
     bool sendLegacyMoveInput(int x, int y, QString* errorMessage = nullptr);
+    bool sendAttackInput(const QString& targetUserId, QString* errorMessage = nullptr);
     bool sendFinishInput(const QString& reason, QString* errorMessage = nullptr);
     QString queryLeaderboardTop(std::size_t limit, QString* errorMessage = nullptr);
     QString queryLeaderboardRank(const QString& userId, QString* errorMessage = nullptr);
