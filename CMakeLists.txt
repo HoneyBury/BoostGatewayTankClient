@@ -76,6 +76,31 @@ target_compile_definitions(boost_gateway_tank_client
         BGTC_APP_VERSION="${PROJECT_VERSION}"
 )
 
+install(TARGETS boost_gateway_tank_client
+    RUNTIME DESTINATION bin
+    BUNDLE DESTINATION .
+)
+install(FILES
+    README.md
+    docs/server-integration.md
+    docs/production-roadmap.md
+    DESTINATION docs
+)
+
+set(CPACK_PACKAGE_NAME "BoostGatewayTankClient")
+set(CPACK_PACKAGE_VENDOR "HoneyBury")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Qt/C++ multiplayer tank validation client for BoostGateway")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+if(APPLE)
+    set(CPACK_GENERATOR "TGZ")
+elseif(WIN32)
+    set(CPACK_GENERATOR "ZIP")
+else()
+    set(CPACK_GENERATOR "TGZ")
+endif()
+include(CPack)
+
 if(BGTC_BUILD_TESTS)
     enable_testing()
     add_executable(tank_protocol_smoke_test

@@ -47,6 +47,18 @@ int main() {
     assert(scoredFinish->scores[0].score == 3);
     assert(scoredFinish->totalFrames == 7);
 
+    const auto itemFrame = bgtc::decodeTankSnapshot(
+        R"({"battle_id":"battle_1","frame_number":3,"kind":"frame_advanced","participants":[{"user_id":"alice","pos_x":50,"pos_y":50}],"items":[{"id":"boost_battle_1","type":"speed","x":3,"y":2,"remaining_ticks":600}],"events":[{"type":"item_pickup","actor":"alice","item_id":"boost_battle_1","item_type":"speed","buff_type":"speed","remaining_ticks":90}],"buffs":[{"user_id":"alice","type":"speed","remaining_ticks":90}]})");
+    assert(itemFrame.has_value());
+    assert(itemFrame->items.size() == 1);
+    assert(itemFrame->items[0].id == "boost_battle_1");
+    assert(itemFrame->events.size() == 1);
+    assert(itemFrame->events[0].type == "item_pickup");
+    assert(itemFrame->events[0].buffType == "speed");
+    assert(itemFrame->buffs.size() == 1);
+    assert(itemFrame->buffs[0].remainingTicks == 90);
+    assert(bgtc::encodeLegacyPickupInput("boost_battle_1") == "pickup:boost_battle_1");
+
     std::cout << "tank protocol smoke test passed\n";
     return 0;
 }

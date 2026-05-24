@@ -39,8 +39,12 @@ TankEvent parseEvent(const json& value) {
     event.type = value.value("type", "");
     event.actor = value.value("actor", "");
     event.target = value.value("target", "");
+    event.itemId = value.value("item_id", "");
+    event.itemType = value.value("item_type", "");
+    event.buffType = value.value("buff_type", "");
     event.damage = value.value("damage", 0);
     event.frame = value.value("frame", 0);
+    event.remainingTicks = value.value("remaining_ticks", 0);
     return event;
 }
 
@@ -59,6 +63,14 @@ BattleScoreState parseScore(const json& value) {
     score.userId = value.value("user_id", "");
     score.score = value.value("score", 0);
     return score;
+}
+
+BuffState parseBuff(const json& value) {
+    BuffState buff;
+    buff.userId = value.value("user_id", "");
+    buff.type = value.value("type", "");
+    buff.remainingTicks = value.value("remaining_ticks", 0);
+    return buff;
 }
 
 std::vector<std::string> split(const std::string& value, char delimiter) {
@@ -133,6 +145,10 @@ std::string encodeLegacyFinishInput(const std::string& reason) {
     return "finish:" + reason;
 }
 
+std::string encodeLegacyPickupInput(const std::string& itemId) {
+    return "pickup:" + itemId;
+}
+
 std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload) {
     auto doc = json::parse(payload, nullptr, false);
     if (doc.is_discarded() || !doc.is_object()) {
@@ -149,6 +165,17 @@ std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload) {
 
     if (doc.contains("payload") && doc["payload"].is_string()) {
         return decodeTankSnapshot(doc["payload"].get<std::string>());
+    }
+    if (doc.contains("snapshot") && doc["snapshot"].is_object()) {
+        auto nested = decodeTankSnapshot(doc["snapshot"].dump());
+        if (nested.has_value()) {
+            nested->frame = doc.value("frame", doc.value("frame_number", nested->frame));
+            if (nested->battleState.has_value()) {
+                nested->battleState->battleId = doc.value("battle_id", nested->battleState->battleId);
+                nested->battleState->frame = nested->frame;
+            }
+            return nested;
+        }
     }
 
     if (doc.value("type", "") != "tank.snapshot" && !doc.contains("tanks") &&
@@ -199,6 +226,11 @@ std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload) {
     if (doc.contains("items") && doc["items"].is_array()) {
         for (const auto& item : doc["items"]) {
             snapshot.items.push_back(parseItem(item));
+        }
+    }
+    if (doc.contains("buffs") && doc["buffs"].is_array()) {
+        for (const auto& buff : doc["buffs"]) {
+            snapshot.buffs.push_back(parseBuff(buff));
         }
     }
     if (doc.contains("scores") && doc["scores"].is_array()) {

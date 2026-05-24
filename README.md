@@ -92,8 +92,10 @@ BGTC_GATEWAY_PORT=9201 \
 - 回放窗口：支持加载当前 battle_id 的服务端回放帧，提供播放、暂停、上一帧、
   下一帧和倍速控制，并复用战斗画面渲染回放帧。
 - 设置窗口：支持保存 gateway host/port、默认房间、玩家前缀和当前 token 到本地 profile。
+- 道具表现：服务端 snapshot 中的道具、拾取事件和 buff 会被解析并渲染；战斗中按 E
+  可拾取当前 snapshot 的首个道具。
 - Headless gate：支持对运行中的 gateway 执行注册、三客户端房间管理、战斗、
-  重连恢复、回放和排行榜闭环验证。
+  重连恢复、道具拾取、回放和排行榜闭环验证。
 - UI flow gate：支持 offscreen 验证本地 profile、回放解析/播放入口和核心 Qt 页面构造。
 
 当前阶段目标是“可验证可联调的 MVP”，不是最终美术品质。
@@ -108,6 +110,15 @@ BGTC_GATEWAY_PORT=9201 \
 - 正式发布阶段应使用安装后的 SDK prefix 或 SDK release artifact。
 
 详见 [docs/server-integration.md](docs/server-integration.md)。
+
+## 打包
+
+```bash
+./scripts/package-client.sh
+```
+
+当前打包入口使用 Release 构建和 CPack 生成可归档开发包，详细边界见
+[docs/packaging.md](docs/packaging.md)。
 
 ## Headless 联调
 
@@ -139,5 +150,6 @@ gateway 协议不一致。
 
 整体路线以“真实多人同屏可玩”为主线。当前已完成真实 SDK 接入、房间大厅、
 多人战斗、排行榜结算、重连后主动恢复 latest snapshot、可播放回放、本地 profile
-和 UI flow gate。下一步优先推进道具协议与玩法表现、桌面端打包发布。详细规划见
+和 UI flow gate、最小道具玩法、CPack 开发包。下一步优先推进更完整的道具规则、
+平台原生安装器和运行日志导出。详细规划见
 [docs/production-roadmap.md](docs/production-roadmap.md)。

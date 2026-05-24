@@ -116,6 +116,25 @@ void BattleWidget::keyPressEvent(QKeyEvent* event) {
         case Qt::Key_Space:
             sendFire(0);
             break;
+        case Qt::Key_E: {
+            const auto itemId = findFirstItemId();
+            if (itemId.isEmpty()) {
+                lastInputError_ = "当前 snapshot 中没有可拾取道具";
+                update();
+                break;
+            }
+            QString error;
+            if (!gateway_.sendPickupInput(itemId, &error)) {
+                lastInputError_ = error;
+                update();
+                break;
+            }
+            ++nextSeq_;
+            lastInput_ = "pickup:" + itemId;
+            lastInputError_.clear();
+            update();
+            break;
+        }
         case Qt::Key_F: {
             QString error;
             if (!gateway_.sendFinishInput("surrender", &error)) {
@@ -213,6 +232,10 @@ void BattleWidget::drawPanel(QPainter& painter) {
     painter.drawText(panelX, y, QString("Tanks  %1    Bullets  %2").arg(snapshot_.tanks.size()).arg(snapshot_.bullets.size()));
     y += 24;
     painter.drawText(panelX, y, QString("Items  %1").arg(snapshot_.items.size()));
+    if (!snapshot_.buffs.empty()) {
+        y += 24;
+        painter.drawText(panelX, y, QString("Buffs  %1").arg(snapshot_.buffs.size()));
+    }
 
     if (const auto* localTank = findLocalTank()) {
         y += 34;
@@ -242,6 +265,8 @@ void BattleWidget::drawPanel(QPainter& painter) {
     y += 24;
     painter.drawText(panelX, y, "空格：攻击最近目标");
     y += 24;
+    painter.drawText(panelX, y, "E：拾取首个道具");
+    y += 24;
     painter.drawText(panelX, y, "F：结束战斗");
     y += 30;
     painter.setPen(QColor("#9fb0c2"));
@@ -259,6 +284,13 @@ void BattleWidget::drawPanel(QPainter& painter) {
         y += 24;
         painter.drawText(panelX, y, lastInputError_.left(30));
     }
+}
+
+QString BattleWidget::findFirstItemId() const {
+    if (snapshot_.items.empty()) {
+        return {};
+    }
+    return QString::fromStdString(snapshot_.items.front().id);
 }
 
 void BattleWidget::drawSettlement(QPainter& painter) {

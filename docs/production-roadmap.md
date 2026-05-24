@@ -146,8 +146,10 @@
   回放页已支持播放、暂停、上一帧、下一帧、倍速，并复用战斗渲染。
 - Profile 已落地：应用启动读取本地 profile，登录/注册和设置页会保存 gateway、
   默认房间、玩家前缀与 token，`BGTC_PROFILE_PATH` 可用于测试隔离。
-- P5 已有道具 snapshot 模型和渲染占位，具体道具协议等待服务端协议稳定。
-- P6 已有构建脚本和 SDK 导入策略，尚未做平台打包。
+- P5 已有道具 snapshot 模型、拾取输入、buff/event 解析和 UI 渲染；真实 live gate
+  已验证服务端最小道具生成、拾取和 speed buff 生效。
+- P6 已有构建脚本、SDK 导入策略、CPack 开发包和 `scripts/package-client.sh`；
+  平台原生安装器、Qt runtime 收集和签名策略仍是后续增强。
 - P7 已有诊断页、SDK version、push/snapshot/input/reconnect 计数；已新增
   `tank_headless_gate`、`tank_ui_smoke_test`、`tank_ui_flow_test`、
   `scripts/run-headless-gate.sh` 和 `scripts/run-live-gate.sh`，可覆盖离线 Qt UI
@@ -175,3 +177,14 @@
 - 自动化：`tank_protocol_smoke_test` 覆盖协议解析，`tank_ui_smoke_test` 覆盖离线
   Qt Widgets 构造和战斗快照渲染，`tank_ui_flow_test` 覆盖 profile 与回放播放入口，
   `tank_headless_gate` 覆盖真实 gateway 的注册、房间管理、战斗、重连恢复、回放和排行榜业务闭环。
+
+## P5/P6 当前收束结论
+
+- 道具协议：当前最小协议不进入公共 SDK；仍通过 battle input/snapshot adapter
+  表达，输入为 `pickup:<item_id>`，snapshot 字段为 `items/events/buffs`。
+- 道具表现：客户端可渲染道具数量、buff 数量和地图道具图标，战斗中按 E 拾取
+  当前 snapshot 的首个道具。
+- 自动化：`tank_protocol_smoke_test` 覆盖 item/buff/event 解析，`tank_headless_gate`
+  覆盖真实 gateway 中的 item spawn 与 pickup buff。
+- 打包发布：`scripts/package-client.sh` 会执行 Release 构建和 CPack 打包，当前产物
+  定位为开发/联调包，不冒进声明完整用户级安装器。

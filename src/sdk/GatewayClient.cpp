@@ -282,6 +282,20 @@ bool GatewayClient::sendFinishInput(const QString& reason, QString* errorMessage
     return true;
 }
 
+bool GatewayClient::sendPickupInput(const QString& itemId, QString* errorMessage) {
+    const auto result = client_->send_battle_input(encodeLegacyPickupInput(toStdString(itemId)), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "send pickup failed");
+        return false;
+    }
+    ++diagnostics_.inputsSent;
+    publishDiagnostics();
+    return true;
+}
+
 QString GatewayClient::queryRoomList(std::size_t page,
                                      std::size_t pageSize,
                                      const QString& status,

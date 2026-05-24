@@ -197,6 +197,31 @@ int main(int argc, char* argv[]) {
                    move_a.error_message + " | " + move_b.error_message);
     std::this_thread::sleep_for(250ms);
 
+    const auto item_state = alice.battle_state(start.battle_id, timeout);
+    const auto item_snapshot = bgtc::decodeTankSnapshot(item_state.response_body);
+    const auto item_id = item_snapshot.has_value() && !item_snapshot->items.empty()
+                             ? item_snapshot->items.front().id
+                             : std::string{};
+    state.add_step("item_spawn_visible",
+                   item_state.ok && item_snapshot.has_value() && !item_id.empty(),
+                   item_state.response_body.empty() ? item_state.error_message : item_state.response_body);
+
+    const auto pickup = item_id.empty()
+                            ? sdk::BattleInputResult{false, -1, "missing_item", 0}
+                            : alice.send_battle_input(bgtc::encodeLegacyPickupInput(item_id), timeout);
+    std::this_thread::sleep_for(250ms);
+    const auto pickup_state = alice.battle_state(start.battle_id, timeout);
+    const auto pickup_snapshot = bgtc::decodeTankSnapshot(pickup_state.response_body);
+    state.add_step("item_pickup_buff",
+                   pickup.ok &&
+                       pickup_state.ok &&
+                       pickup_snapshot.has_value() &&
+                       !pickup_snapshot->buffs.empty() &&
+                       pickup_snapshot->buffs.front().type == "speed",
+                   pickup_state.response_body.empty()
+                       ? pickup.error_message
+                       : pickup_state.response_body);
+
     const auto battle_state = alice.battle_state(start.battle_id, timeout);
     const auto restored_snapshot = bgtc::decodeTankSnapshot(battle_state.response_body);
     state.add_step("battle_state_query",

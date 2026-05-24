@@ -32,8 +32,12 @@ struct TankEvent {
     std::string type;
     std::string actor;
     std::string target;
+    std::string itemId;
+    std::string itemType;
+    std::string buffType;
     int damage = 0;
     int frame = 0;
+    int remainingTicks = 0;
 };
 
 struct ItemState {
@@ -59,6 +63,12 @@ struct BattleScoreState {
     int score = 0;
 };
 
+struct BuffState {
+    std::string userId;
+    std::string type;
+    int remainingTicks = 0;
+};
+
 struct TankSnapshot {
     int frame = 0;
     int totalFrames = 0;
@@ -69,6 +79,7 @@ struct TankSnapshot {
     std::vector<BulletState> bullets;
     std::vector<TankEvent> events;
     std::vector<ItemState> items;
+    std::vector<BuffState> buffs;
     std::vector<BattleScoreState> scores;
     std::optional<BattleStateEvent> battleState;
 };

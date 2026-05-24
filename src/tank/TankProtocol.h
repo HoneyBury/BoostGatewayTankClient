@@ -30,6 +30,7 @@ std::string encodeTankInput(const TankInput& input);
 std::string encodeLegacyMoveInput(int x, int y);
 std::string encodeLegacyAttackInput(const std::string& targetUserId);
 std::string encodeLegacyFinishInput(const std::string& reason);
+std::string encodeLegacyPickupInput(const std::string& itemId);
 std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload);
 std::optional<BattleStateEvent> decodeBattleStateEvent(const std::string& payload);
 std::optional<ReplayTimeline> decodeReplayTimeline(const std::string& payload);

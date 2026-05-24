@@ -47,6 +47,7 @@ public:
     bool sendLegacyMoveInput(int x, int y, QString* errorMessage = nullptr);
     bool sendAttackInput(const QString& targetUserId, QString* errorMessage = nullptr);
     bool sendFinishInput(const QString& reason, QString* errorMessage = nullptr);
+    bool sendPickupInput(const QString& itemId, QString* errorMessage = nullptr);
     QString queryRoomList(std::size_t page = 1,
                           std::size_t pageSize = 20,
                           const QString& status = {},
