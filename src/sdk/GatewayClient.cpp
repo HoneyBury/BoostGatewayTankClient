@@ -11,6 +11,7 @@ namespace bgtc {
 namespace {
 
 constexpr auto kDefaultTimeout = std::chrono::seconds(5);
+constexpr auto kBattleTimeout = std::chrono::milliseconds(350);
 
 std::string toStdString(const QString& value) {
     return value.toUtf8().toStdString();
@@ -227,7 +228,7 @@ bool GatewayClient::startBattle(const QString& roomId, QString* battleId, QStrin
 }
 
 bool GatewayClient::sendTankInput(const TankInput& input, QString* errorMessage) {
-    const auto result = client_->send_battle_input(encodeTankInput(input), kDefaultTimeout);
+    const auto result = client_->send_battle_input(encodeTankInput(input), kBattleTimeout);
     if (!result.ok) {
         if (errorMessage) {
             *errorMessage = formatError(result.error_code, result.error_message);
@@ -241,7 +242,7 @@ bool GatewayClient::sendTankInput(const TankInput& input, QString* errorMessage)
 }
 
 bool GatewayClient::sendLegacyMoveInput(int x, int y, QString* errorMessage) {
-    const auto result = client_->send_battle_input(encodeLegacyMoveInput(x, y), kDefaultTimeout);
+    const auto result = client_->send_battle_input(encodeLegacyMoveInput(x, y), kBattleTimeout);
     if (!result.ok) {
         if (errorMessage) {
             *errorMessage = formatError(result.error_code, result.error_message);
@@ -255,7 +256,7 @@ bool GatewayClient::sendLegacyMoveInput(int x, int y, QString* errorMessage) {
 }
 
 bool GatewayClient::sendAttackInput(const QString& targetUserId, QString* errorMessage) {
-    const auto result = client_->send_battle_input(encodeLegacyAttackInput(toStdString(targetUserId)), kDefaultTimeout);
+    const auto result = client_->send_battle_input(encodeLegacyAttackInput(toStdString(targetUserId)), kBattleTimeout);
     if (!result.ok) {
         if (errorMessage) {
             *errorMessage = formatError(result.error_code, result.error_message);
@@ -269,7 +270,7 @@ bool GatewayClient::sendAttackInput(const QString& targetUserId, QString* errorM
 }
 
 bool GatewayClient::sendFinishInput(const QString& reason, QString* errorMessage) {
-    const auto result = client_->send_battle_input(encodeLegacyFinishInput(reason.toStdString()), kDefaultTimeout);
+    const auto result = client_->send_battle_input(encodeLegacyFinishInput(reason.toStdString()), kBattleTimeout);
     if (!result.ok) {
         if (errorMessage) {
             *errorMessage = formatError(result.error_code, result.error_message);
@@ -283,7 +284,7 @@ bool GatewayClient::sendFinishInput(const QString& reason, QString* errorMessage
 }
 
 bool GatewayClient::sendPickupInput(const QString& itemId, QString* errorMessage) {
-    const auto result = client_->send_battle_input(encodeLegacyPickupInput(toStdString(itemId)), kDefaultTimeout);
+    const auto result = client_->send_battle_input(encodeLegacyPickupInput(toStdString(itemId)), kBattleTimeout);
     if (!result.ok) {
         if (errorMessage) {
             *errorMessage = formatError(result.error_code, result.error_message);
@@ -324,7 +325,7 @@ QString GatewayClient::queryRoomDetail(const QString& roomId, QString* errorMess
 }
 
 QString GatewayClient::queryBattleState(const QString& battleId, QString* errorMessage) {
-    const auto result = client_->battle_state(toStdString(battleId), kDefaultTimeout);
+    const auto result = client_->battle_state(toStdString(battleId), kBattleTimeout);
     if (!result.ok) {
         if (errorMessage) {
             *errorMessage = formatError(result.error_code, result.error_message);

@@ -231,6 +231,13 @@ void MainWindow::showPage(int index) {
 }
 
 void MainWindow::handleTankSnapshot(const TankSnapshot& snapshot) {
+    if (snapshot.battleState.has_value() && !snapshot.battleState->battleId.empty()) {
+        session_.battleId = QString::fromStdString(snapshot.battleState->battleId);
+        if (!snapshot.finished) {
+            session_.state = ConnectionState::InBattle;
+        }
+    }
+
     if (!snapshot.finished) {
         return;
     }

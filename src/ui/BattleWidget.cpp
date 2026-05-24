@@ -5,16 +5,36 @@
 #include <QFont>
 #include <QKeyEvent>
 #include <QPainter>
+#include <QTimer>
 #include <algorithm>
 
 namespace bgtc {
 namespace {
 
 constexpr int kCell = 32;
+constexpr int kWorldCell = 50;
 constexpr int kMapWidth = 20;
 constexpr int kMapHeight = 15;
 constexpr int kMapMargin = 18;
-constexpr int kPanelWidth = 280;
+constexpr int kPanelWidth = 340;
+constexpr int kMoveIntervalMs = 120;
+constexpr int kSnapshotPollMs = 250;
+
+int clampGridX(int x) {
+    return std::clamp(x, 0, kMapWidth - 1);
+}
+
+int clampGridY(int y) {
+    return std::clamp(y, 0, kMapHeight - 1);
+}
+
+int gridToWorld(int value) {
+    return value * kWorldCell;
+}
+
+int worldToGrid(int value, int maxGrid) {
+    return std::clamp((value + kWorldCell / 2) / kWorldCell, 0, maxGrid);
+}
 
 }  // namespace
 
@@ -22,10 +42,28 @@ BattleWidget::BattleWidget(ClientSession& session, GatewayClient& gateway, QWidg
     : QWidget(parent), session_(session), gateway_(gateway) {
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(kMapWidth * kCell + kPanelWidth + kMapMargin * 3, kMapHeight * kCell + kMapMargin * 2);
+
+    movementTimer_ = new QTimer(this);
+    movementTimer_->setInterval(kMoveIntervalMs);
+    connect(movementTimer_, &QTimer::timeout, this, [this]() {
+        if ((activeDx_ != 0 || activeDy_ != 0) && !snapshot_.finished) {
+            sendMove(activeDx_, activeDy_);
+        }
+    });
+
+    snapshotPollTimer_ = new QTimer(this);
+    snapshotPollTimer_->setInterval(kSnapshotPollMs);
+    connect(snapshotPollTimer_, &QTimer::timeout, this, &BattleWidget::pollBattleState);
+    snapshotPollTimer_->start();
 }
 
 void BattleWidget::applySnapshot(TankSnapshot snapshot) {
     snapshot_ = std::move(snapshot);
+    if (const auto* localTank = findLocalTank()) {
+        const auto grid = tankToGrid(*localTank);
+        fallbackGridX_ = grid.x();
+        fallbackGridY_ = grid.y();
+    }
     update();
 }
 
@@ -96,22 +134,21 @@ void BattleWidget::paintEvent(QPaintEvent*) {
 }
 
 void BattleWidget::keyPressEvent(QKeyEvent* event) {
+    if (event->isAutoRepeat()) {
+        QWidget::keyPressEvent(event);
+        return;
+    }
+
     switch (event->key()) {
         case Qt::Key_W:
         case Qt::Key_Up:
-            sendMove(0, -1);
-            break;
         case Qt::Key_S:
         case Qt::Key_Down:
-            sendMove(0, 1);
-            break;
         case Qt::Key_A:
         case Qt::Key_Left:
-            sendMove(-1, 0);
-            break;
         case Qt::Key_D:
         case Qt::Key_Right:
-            sendMove(1, 0);
+            setMovementKey(event->key(), true);
             break;
         case Qt::Key_Space:
             sendFire(0);
@@ -149,23 +186,112 @@ void BattleWidget::keyPressEvent(QKeyEvent* event) {
     }
 }
 
-void BattleWidget::sendMove(int dx, int dy) {
-    const auto* localTank = findLocalTank();
-    const int currentX = localTank ? localTank->x : fallbackX_;
-    const int currentY = localTank ? localTank->y : fallbackY_;
-    const int targetX = std::clamp(currentX + dx * kCell, 0, 1000);
-    const int targetY = std::clamp(currentY + dy * kCell, 0, 1000);
+void BattleWidget::keyReleaseEvent(QKeyEvent* event) {
+    if (event->isAutoRepeat()) {
+        QWidget::keyReleaseEvent(event);
+        return;
+    }
 
+    switch (event->key()) {
+        case Qt::Key_W:
+        case Qt::Key_Up:
+        case Qt::Key_S:
+        case Qt::Key_Down:
+        case Qt::Key_A:
+        case Qt::Key_Left:
+        case Qt::Key_D:
+        case Qt::Key_Right:
+            setMovementKey(event->key(), false);
+            break;
+        default:
+            QWidget::keyReleaseEvent(event);
+            break;
+    }
+}
+
+void BattleWidget::setMovementKey(int key, bool pressed) {
+    switch (key) {
+        case Qt::Key_W:
+        case Qt::Key_Up:
+            keyUp_ = pressed;
+            break;
+        case Qt::Key_S:
+        case Qt::Key_Down:
+            keyDown_ = pressed;
+            break;
+        case Qt::Key_A:
+        case Qt::Key_Left:
+            keyLeft_ = pressed;
+            break;
+        case Qt::Key_D:
+        case Qt::Key_Right:
+            keyRight_ = pressed;
+            break;
+        default:
+            break;
+    }
+
+    updateMovementVector();
+    if (activeDx_ != 0 || activeDy_ != 0) {
+        if (!movementTimer_->isActive()) {
+            movementTimer_->start();
+        }
+        sendMove(activeDx_, activeDy_);
+    } else {
+        movementTimer_->stop();
+    }
+}
+
+void BattleWidget::updateMovementVector() {
+    const int rawDx = (keyRight_ ? 1 : 0) - (keyLeft_ ? 1 : 0);
+    const int rawDy = (keyDown_ ? 1 : 0) - (keyUp_ ? 1 : 0);
+
+    // 单帧只允许一个轴移动，避免 W+D 这类组合键产生斜向跳格。
+    if (rawDx != 0) {
+        activeDx_ = rawDx;
+        activeDy_ = 0;
+        return;
+    }
+    activeDx_ = 0;
+    activeDy_ = rawDy;
+}
+
+void BattleWidget::sendMove(int dx, int dy) {
+    if (inputBusy_) {
+        return;
+    }
+
+    const auto* localTank = findLocalTank();
+    int currentGridX = fallbackGridX_;
+    int currentGridY = fallbackGridY_;
+    if (localTank != nullptr) {
+        const auto grid = tankToGrid(*localTank);
+        currentGridX = grid.x();
+        currentGridY = grid.y();
+    }
+
+    const int targetGridX = clampGridX(currentGridX + dx);
+    const int targetGridY = clampGridY(currentGridY + dy);
+    if (targetGridX == currentGridX && targetGridY == currentGridY) {
+        return;
+    }
+
+    const int targetX = gridToWorld(targetGridX);
+    const int targetY = gridToWorld(targetGridY);
+
+    inputBusy_ = true;
     QString error;
     if (!gateway_.sendLegacyMoveInput(targetX, targetY, &error)) {
+        inputBusy_ = false;
         lastInputError_ = error;
         update();
         return;
     }
+    inputBusy_ = false;
     ++nextSeq_;
-    fallbackX_ = targetX;
-    fallbackY_ = targetY;
-    lastInput_ = QString("move:%1,%2").arg(targetX).arg(targetY);
+    fallbackGridX_ = targetGridX;
+    fallbackGridY_ = targetGridY;
+    lastInput_ = QString("move:%1,%2").arg(targetGridX).arg(targetGridY);
     lastInputError_.clear();
     update();
 }
@@ -191,6 +317,20 @@ void BattleWidget::sendFire(int direction) {
     update();
 }
 
+void BattleWidget::pollBattleState() {
+    if (session_.battleId.isEmpty() || snapshot_.finished) {
+        return;
+    }
+    QString error;
+    const auto body = gateway_.queryBattleState(session_.battleId, &error);
+    if (!error.isEmpty() || body.isEmpty()) {
+        return;
+    }
+    if (auto snapshot = decodeTankSnapshot(body.toStdString())) {
+        applySnapshot(*snapshot);
+    }
+}
+
 void BattleWidget::drawPanel(QPainter& painter) {
     const QRect panel(kMapMargin * 2 + kMapWidth * kCell, kMapMargin, kPanelWidth, kMapHeight * kCell);
     painter.setPen(QColor("#26384a"));
@@ -200,14 +340,14 @@ void BattleWidget::drawPanel(QPainter& painter) {
     const int panelX = panel.left() + 20;
     int y = panel.top() + 34;
     QFont titleFont = painter.font();
-    titleFont.setPointSize(titleFont.pointSize() + 3);
+    titleFont.setPixelSize(20);
     titleFont.setBold(true);
     painter.setFont(titleFont);
     painter.setPen(QColor("#f7fbff"));
     painter.drawText(panelX, y, "战斗面板");
 
     QFont bodyFont = painter.font();
-    bodyFont.setPointSize(bodyFont.pointSize() - 3);
+    bodyFont.setPixelSize(15);
     bodyFont.setBold(false);
     painter.setFont(bodyFont);
 
@@ -216,7 +356,7 @@ void BattleWidget::drawPanel(QPainter& painter) {
     painter.drawText(panelX, y, "Battle ID");
     y += 22;
     painter.setPen(QColor("#e8f1f8"));
-    painter.drawText(panelX, y, session_.battleId.isEmpty() ? "等待开始" : session_.battleId.left(24));
+    painter.drawText(panelX, y, session_.battleId.isEmpty() ? "等待开始" : session_.battleId.left(30));
 
     y += 36;
     painter.setPen(QColor("#9fb0c2"));
@@ -238,6 +378,7 @@ void BattleWidget::drawPanel(QPainter& painter) {
     }
 
     if (const auto* localTank = findLocalTank()) {
+        const auto grid = tankToGrid(*localTank);
         y += 34;
         painter.setPen(QColor("#9fb0c2"));
         painter.drawText(panelX, y, "我的坦克");
@@ -245,7 +386,7 @@ void BattleWidget::drawPanel(QPainter& painter) {
         painter.setPen(QColor("#e8f1f8"));
         painter.drawText(panelX, y, QString("HP %1    Score %2").arg(localTank->hp).arg(localTank->score));
         y += 24;
-        painter.drawText(panelX, y, QString("Position %1, %2").arg(localTank->x).arg(localTank->y));
+        painter.drawText(panelX, y, QString("Grid %1, %2").arg(grid.x()).arg(grid.y()));
     }
     if (snapshot_.battleState.has_value()) {
         y += 30;
@@ -261,7 +402,7 @@ void BattleWidget::drawPanel(QPainter& painter) {
     painter.drawText(panelX, y, "操作");
     y += 24;
     painter.setPen(QColor("#e8f1f8"));
-    painter.drawText(panelX, y, "WASD / 方向键：移动");
+    painter.drawText(panelX, y, "WASD / 方向键：按网格移动");
     y += 24;
     painter.drawText(panelX, y, "空格：攻击最近目标");
     y += 24;
@@ -275,14 +416,14 @@ void BattleWidget::drawPanel(QPainter& painter) {
     if (!lastInput_.isEmpty()) {
         y += 30;
         painter.setPen(QColor("#26d9a1"));
-        painter.drawText(panelX, y, "最近输入：" + lastInput_.left(24));
+        painter.drawText(panelX, y, "最近输入：" + lastInput_.left(28));
     }
     if (!lastInputError_.isEmpty()) {
         painter.setPen(QColor("#ffb703"));
         y += 30;
         painter.drawText(panelX, y, "最近输入错误：");
         y += 24;
-        painter.drawText(panelX, y, lastInputError_.left(30));
+        painter.drawText(panelX, y, lastInputError_.left(34));
     }
 }
 
@@ -301,13 +442,13 @@ void BattleWidget::drawSettlement(QPainter& painter) {
     painter.drawRoundedRect(card, 18, 18);
 
     QFont titleFont = painter.font();
-    titleFont.setPointSize(titleFont.pointSize() + 5);
+    titleFont.setPixelSize(24);
     titleFont.setBold(true);
     painter.setFont(titleFont);
     painter.setPen(QColor("#ffd166"));
     painter.drawText(card.adjusted(24, 28, -24, -24), "战斗结算");
     QFont bodyFont = painter.font();
-    bodyFont.setPointSize(bodyFont.pointSize() - 5);
+    bodyFont.setPixelSize(16);
     bodyFont.setBold(false);
     painter.setFont(bodyFont);
 
@@ -358,9 +499,14 @@ QString BattleWidget::findFirstOpponentUserId() const {
 }
 
 QPoint BattleWidget::tankToScreen(const TankState& tank) const {
-    const int x = std::clamp(tank.x / kCell, 0, kMapWidth - 1) * kCell;
-    const int y = std::clamp(tank.y / kCell, 0, kMapHeight - 1) * kCell;
+    const auto grid = tankToGrid(tank);
+    const int x = grid.x() * kCell;
+    const int y = grid.y() * kCell;
     return QPoint(x, y);
+}
+
+QPoint BattleWidget::tankToGrid(const TankState& tank) const {
+    return QPoint(worldToGrid(tank.x, kMapWidth - 1), worldToGrid(tank.y, kMapHeight - 1));
 }
 
 }  // namespace bgtc

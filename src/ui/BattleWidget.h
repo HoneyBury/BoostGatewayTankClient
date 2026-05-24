@@ -6,6 +6,9 @@
 
 #include <QWidget>
 
+class QKeyEvent;
+class QTimer;
+
 namespace bgtc {
 
 class BattleWidget final : public QWidget {
@@ -22,23 +25,37 @@ public slots:
 protected:
     void paintEvent(QPaintEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void keyReleaseEvent(QKeyEvent* event) override;
 
 private:
     void sendMove(int dx, int dy);
     void sendFire(int direction);
+    void pollBattleState();
+    void updateMovementVector();
+    void setMovementKey(int key, bool pressed);
     void drawPanel(QPainter& painter);
     void drawSettlement(QPainter& painter);
     [[nodiscard]] const TankState* findLocalTank() const;
     [[nodiscard]] QString findFirstOpponentUserId() const;
     [[nodiscard]] QString findFirstItemId() const;
     [[nodiscard]] QPoint tankToScreen(const TankState& tank) const;
+    [[nodiscard]] QPoint tankToGrid(const TankState& tank) const;
 
     ClientSession& session_;
     GatewayClient& gateway_;
     TankSnapshot snapshot_;
+    QTimer* movementTimer_ = nullptr;
+    QTimer* snapshotPollTimer_ = nullptr;
     std::uint64_t nextSeq_ = 1;
-    int fallbackX_ = 0;
-    int fallbackY_ = 0;
+    int fallbackGridX_ = 0;
+    int fallbackGridY_ = 0;
+    int activeDx_ = 0;
+    int activeDy_ = 0;
+    bool keyUp_ = false;
+    bool keyDown_ = false;
+    bool keyLeft_ = false;
+    bool keyRight_ = false;
+    bool inputBusy_ = false;
     QString lastInput_;
     QString lastInputError_;
 };
