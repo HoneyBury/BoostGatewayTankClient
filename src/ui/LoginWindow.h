@@ -18,8 +18,9 @@ public:
 
 private:
     void handleLogin();
-    void handleRegisterHint();
+    void handleRegister();
     void setStatus(const QString& text);
+    [[nodiscard]] bool updateConfigFromForm();
 
     AppConfig config_;
     QLineEdit* hostEdit_ = nullptr;

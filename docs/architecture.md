@@ -42,6 +42,9 @@ Gateway / 后端服务
   更容易使用的信号和方法。
 - `src/tank/`：负责 `tank.input` 编码、`tank.snapshot` 解码和客户端战斗模型。
 - `src/ui/`：登录、大厅、战斗画面等 Qt Widgets。
+- 当前真实 SDK 功能入口覆盖注册/登录、房间列表/详情、踢出成员、转让房主、
+  战斗状态查询、排行榜和回放加载；坦克业务输入与 snapshot 仍由客户端 adapter
+  负责，不污染公共 SDK。
 
 ## 线程模型
 
@@ -76,7 +79,8 @@ cmake -S . -B build/local \
 
 ## 后续模块规划
 
-- `src/replay/`：回放列表、回放加载、时间轴、暂停/恢复、倍速播放。
+- `src/replay/`：回放列表、时间轴、暂停/恢复、倍速播放；当前回放加载已先接入
+  `GatewayClient::loadReplay()` 并在 UI 中展示服务端 JSON。
 - `src/items/`：道具/增益模型、图标、冷却时间、拾取事件渲染。
 - `src/diagnostics/`：延迟、frame lag、push rate、SDK version、重连次数。
 - `src/bot/`：可选 headless bot，用于双人联调和自动化验证。

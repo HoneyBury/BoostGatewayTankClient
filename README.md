@@ -83,13 +83,16 @@ BGTC_GATEWAY_PORT=9201 \
 当前客户端状态：
 
 - 登录窗口：支持 host、port、user id、token 输入。
-- 大厅窗口：支持创建房间、加入房间、准备、开始战斗、离开房间、查询排行榜；
-  房间列表和房间详情已通过 SDK 访问真实 gateway/backend，房主管理仍保留能力提示。
+- 登录窗口：支持注册账号、连接登录、host、port、user id、token 输入。
+- 大厅窗口：支持创建房间、加入房间、准备、开始战斗、离开房间、查询排行榜、
+  房间列表、房间详情、踢出成员和转让房主。
 - 战斗窗口：支持网格渲染、服务端 snapshot 渲染、玩家 HP/Score/Pos HUD、
   结算卡片，WASD/方向键发送真实 `move:x,y`，空格发送 `attack:user_id`，
   F 发送 `finish:reason`。
 - 排行榜窗口：支持格式化展示 top/rank，并在战斗结束后显示最近一局结算摘要。
-- Headless gate：支持对运行中的 gateway 执行双客户端房间战斗闭环验证。
+- 回放窗口：支持加载当前 battle_id 的服务端回放帧 JSON。
+- Headless gate：支持对运行中的 gateway 执行注册、三客户端房间管理、战斗、
+  重连恢复、回放和排行榜闭环验证。
 
 当前阶段目标是“可验证可联调的 MVP”，不是最终美术品质。
 

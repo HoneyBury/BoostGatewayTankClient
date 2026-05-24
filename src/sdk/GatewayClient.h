@@ -39,6 +39,8 @@ public:
     bool createRoom(const QString& roomId, QString* errorMessage = nullptr);
     bool joinRoom(const QString& roomId, QString* errorMessage = nullptr);
     bool leaveRoom(const QString& roomId, QString* errorMessage = nullptr);
+    bool kickRoomMember(const QString& targetUserId, QString* errorMessage = nullptr);
+    bool transferRoomOwner(const QString& newOwnerId, QString* errorMessage = nullptr);
     bool setReady(bool ready, QString* errorMessage = nullptr);
     bool startBattle(const QString& roomId, QString* battleId, QString* errorMessage = nullptr);
     bool sendTankInput(const TankInput& input, QString* errorMessage = nullptr);
@@ -51,6 +53,7 @@ public:
                           QString* errorMessage = nullptr);
     QString queryRoomDetail(const QString& roomId, QString* errorMessage = nullptr);
     QString queryBattleState(const QString& battleId, QString* errorMessage = nullptr);
+    QString loadReplay(const QString& battleId, QString* errorMessage = nullptr);
     QString queryLeaderboardTop(std::size_t limit, QString* errorMessage = nullptr);
     QString queryLeaderboardRank(const QString& userId, QString* errorMessage = nullptr);
 

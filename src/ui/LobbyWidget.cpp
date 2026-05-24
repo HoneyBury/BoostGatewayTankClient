@@ -35,7 +35,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     layout->addWidget(roomState_);
 
     capabilityState_ = new QLabel(
-        "当前可用：创建、加入、离开、准备、开始战斗、房间列表、房间详情。房主管理仍等待服务端 SDK API。",
+        "当前可用：创建、加入、离开、准备、开始战斗、房间列表、房间详情、踢出成员、转让房主。",
         this);
     capabilityState_->setObjectName("PageHint");
     capabilityState_->setWordWrap(true);
@@ -44,6 +44,10 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     roomEdit_ = new QLineEdit(config_.defaultRoom, this);
     roomEdit_->setPlaceholderText("room_id，例如 default-room");
     layout->addWidget(roomEdit_);
+
+    adminUserEdit_ = new QLineEdit(this);
+    adminUserEdit_->setPlaceholderText("房主管理目标 user_id，例如 player_2");
+    layout->addWidget(adminUserEdit_);
 
     auto* row = new QGridLayout();
     row->setHorizontalSpacing(10);
@@ -56,7 +60,8 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     auto* unreadyButton = new QPushButton("取消准备", this);
     auto* startButton = new QPushButton("开始战斗", this);
     auto* leaveButton = new QPushButton("离开房间", this);
-    auto* adminButton = new QPushButton("房主管理", this);
+    auto* kickButton = new QPushButton("踢出成员", this);
+    auto* transferButton = new QPushButton("转让房主", this);
     auto* leaderboardButton = new QPushButton("排行榜", this);
 
     row->addWidget(createButton, 0, 0);
@@ -67,8 +72,9 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     row->addWidget(leaveButton, 1, 1);
     row->addWidget(listButton, 1, 2);
     row->addWidget(detailButton, 1, 3);
-    row->addWidget(adminButton, 1, 4);
-    row->addWidget(leaderboardButton, 1, 5);
+    row->addWidget(kickButton, 1, 4);
+    row->addWidget(transferButton, 1, 5);
+    row->addWidget(leaderboardButton, 1, 6);
     row->setColumnStretch(4, 1);
     layout->addLayout(row);
 
@@ -90,7 +96,8 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     connect(unreadyButton, &QPushButton::clicked, this, &LobbyWidget::unsetReady);
     connect(startButton, &QPushButton::clicked, this, &LobbyWidget::startBattle);
     connect(leaveButton, &QPushButton::clicked, this, &LobbyWidget::leaveRoom);
-    connect(adminButton, &QPushButton::clicked, this, &LobbyWidget::showUnsupportedRoomAdmin);
+    connect(kickButton, &QPushButton::clicked, this, &LobbyWidget::kickRoomMember);
+    connect(transferButton, &QPushButton::clicked, this, &LobbyWidget::transferRoomOwner);
     connect(leaderboardButton, &QPushButton::clicked, this, &LobbyWidget::refreshLeaderboard);
     connect(roomList_, &QListWidget::itemClicked, this, &LobbyWidget::selectRoomFromList);
     connect(&gateway_, &GatewayClient::pushReceived, this, &LobbyWidget::appendLog);
@@ -211,8 +218,40 @@ void LobbyWidget::refreshRoomDetail() {
     appendLog(error.isEmpty() ? "房间详情：" + body : "查询房间详情失败：" + error);
 }
 
-void LobbyWidget::showUnsupportedRoomAdmin() {
-    appendLog(gateway_.unsupportedFeatureMessage("踢人/转让房主/房间详情"));
+void LobbyWidget::kickRoomMember() {
+    if (!requireRoom("踢出成员")) {
+        return;
+    }
+    const auto target = adminUserEdit_->text().trimmed();
+    if (target.isEmpty()) {
+        appendLog("踢出成员失败：请先输入目标 user_id。");
+        return;
+    }
+    QString error;
+    if (gateway_.kickRoomMember(target, &error)) {
+        appendLog("已踢出成员：" + target);
+        refreshRoomDetail();
+    } else {
+        appendLog("踢出成员失败：" + error);
+    }
+}
+
+void LobbyWidget::transferRoomOwner() {
+    if (!requireRoom("转让房主")) {
+        return;
+    }
+    const auto target = adminUserEdit_->text().trimmed();
+    if (target.isEmpty()) {
+        appendLog("转让房主失败：请先输入目标 user_id。");
+        return;
+    }
+    QString error;
+    if (gateway_.transferRoomOwner(target, &error)) {
+        appendLog("房主已转让给：" + target);
+        refreshRoomDetail();
+    } else {
+        appendLog("转让房主失败：" + error);
+    }
 }
 
 void LobbyWidget::appendLog(const QString& text) {

@@ -34,7 +34,8 @@ private:
     void refreshLeaderboard();
     void refreshRoomList();
     void refreshRoomDetail();
-    void showUnsupportedRoomAdmin();
+    void kickRoomMember();
+    void transferRoomOwner();
     void appendLog(const QString& text);
     void refreshRoomSummary();
     void selectRoomFromList(QListWidgetItem* item);
@@ -45,6 +46,7 @@ private:
     ClientSession& session_;
     GatewayClient& gateway_;
     QLineEdit* roomEdit_ = nullptr;
+    QLineEdit* adminUserEdit_ = nullptr;
     QLabel* roomState_ = nullptr;
     QLabel* capabilityState_ = nullptr;
     QListWidget* roomList_ = nullptr;

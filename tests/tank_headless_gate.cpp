@@ -103,11 +103,13 @@ int main(int argc, char* argv[]) {
     const auto run_id = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
     const auto alice_id = "qt_gate_alice_" + run_id;
     const auto bob_id = "qt_gate_bob_" + run_id;
+    const auto charlie_id = "qt_gate_charlie_" + run_id;
     const auto room_id = "qt_gate_room_" + run_id;
 
     GateState state;
     sdk::SdkClient alice;
     sdk::SdkClient bob;
+    sdk::SdkClient charlie;
     auto on_push = [&](const sdk::PushMessage& push) {
         std::lock_guard<std::mutex> lock(state.mutex);
         state.pushes.push_back(push);
@@ -115,26 +117,62 @@ int main(int argc, char* argv[]) {
     };
     alice.on_push(on_push);
     bob.on_push(on_push);
+    charlie.on_push(on_push);
 
     constexpr auto timeout = 10s;
     const auto alice_connected = alice.connect(host, port, timeout);
     const auto bob_connected = bob.connect(host, port, timeout);
-    state.add_step("connect_two_clients", alice_connected && bob_connected);
-    if (!alice_connected || !bob_connected) {
+    const auto charlie_connected = charlie.connect(host, port, timeout);
+    state.add_step("connect_three_clients", alice_connected && bob_connected && charlie_connected);
+    if (!alice_connected || !bob_connected || !charlie_connected) {
         write_summary(state, host, port, room_id);
         return 2;
     }
 
+    const auto alice_register = alice.register_account(alice_id, "token:" + alice_id, alice_id, timeout);
+    const auto bob_register = bob.register_account(bob_id, "token:" + bob_id, bob_id, timeout);
+    const auto charlie_register = charlie.register_account(charlie_id, "token:" + charlie_id, charlie_id, timeout);
+    state.add_step("register_three_users",
+                   alice_register.ok && bob_register.ok && charlie_register.ok,
+                   alice_register.error_message + " | " + bob_register.error_message + " | " +
+                       charlie_register.error_message);
+
     const auto alice_login = alice.login(alice_id, "token:" + alice_id, timeout);
     const auto bob_login = bob.login(bob_id, "token:" + bob_id, timeout);
-    state.add_step("login_two_users", alice_login.ok && bob_login.ok,
-                   alice_login.error_message + " | " + bob_login.error_message);
+    const auto charlie_login = charlie.login(charlie_id, "token:" + charlie_id, timeout);
+    state.add_step("login_three_users", alice_login.ok && bob_login.ok && charlie_login.ok,
+                   alice_login.error_message + " | " + bob_login.error_message + " | " +
+                       charlie_login.error_message);
 
     const auto create = alice.create_room(room_id, timeout);
     state.add_step("create_room", create.ok, create.error_message);
 
     const auto join = bob.join_room(room_id, timeout);
     state.add_step("join_room", join.ok, join.error_message);
+
+    const auto join_charlie = charlie.join_room(room_id, timeout);
+    state.add_step("join_third_member", join_charlie.ok, join_charlie.error_message);
+
+    const auto kick_charlie = alice.room_kick(charlie_id, timeout);
+    const auto detail_after_kick = alice.room_detail(room_id, timeout);
+    state.add_step("room_kick_member",
+                   kick_charlie.ok &&
+                       detail_after_kick.ok &&
+                       detail_after_kick.response_body.find(charlie_id) == std::string::npos,
+                   detail_after_kick.response_body.empty()
+                       ? kick_charlie.error_message
+                       : detail_after_kick.response_body);
+
+    const auto transfer_owner = alice.room_transfer_owner(bob_id, timeout);
+    const auto detail_after_transfer = alice.room_detail(room_id, timeout);
+    state.add_step("room_transfer_owner",
+                   transfer_owner.ok &&
+                       detail_after_transfer.ok &&
+                       detail_after_transfer.response_body.find("\"owner_user_id\":\"" + bob_id + "\"") !=
+                           std::string::npos,
+                   detail_after_transfer.response_body.empty()
+                       ? transfer_owner.error_message
+                       : detail_after_transfer.response_body);
 
     const auto room_list = alice.room_list(1, 20, "", timeout);
     state.add_step("room_list", room_list.ok && room_list.response_body.find(room_id) != std::string::npos,
@@ -149,7 +187,7 @@ int main(int argc, char* argv[]) {
     state.add_step("ready_two_users", ready_a.ok && ready_b.ok,
                    ready_a.error_message + " | " + ready_b.error_message);
 
-    const auto start = alice.start_battle(room_id, timeout);
+    const auto start = bob.start_battle(room_id, timeout);
     state.add_step("start_battle", start.ok, start.error_message);
     std::this_thread::sleep_for(250ms);
 
@@ -189,6 +227,13 @@ int main(int argc, char* argv[]) {
     state.add_step("finish_battle", finish.ok, finish.error_message);
     std::this_thread::sleep_for(250ms);
 
+    const auto replay = alice.replay_load(start.battle_id, timeout);
+    state.add_step("replay_load",
+                   replay.ok &&
+                       replay.response_body.find(start.battle_id) != std::string::npos &&
+                       replay.response_body.find("\"frames\"") != std::string::npos,
+                   replay.response_body.empty() ? replay.error_message : replay.response_body);
+
     const bool saw_started =
         state.saw_push_fragment("battle_state:kind=started") ||
         start.error_message.find("battle_started") != std::string::npos;
@@ -205,6 +250,7 @@ int main(int argc, char* argv[]) {
     bob_reconnected.leave_room(room_id, timeout);
     alice.disconnect();
     bob.disconnect();
+    charlie.disconnect();
 
     write_summary(state, host, port, room_id);
     return state.overall_pass() ? 0 : 1;

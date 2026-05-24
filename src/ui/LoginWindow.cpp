@@ -1,5 +1,6 @@
 #include "ui/LoginWindow.h"
 
+#include "sdk/GatewayClient.h"
 #include "ui/MainWindow.h"
 
 #include <QFormLayout>
@@ -35,26 +36,20 @@ LoginWindow::LoginWindow(AppConfig config, QWidget* parent)
     layout->addWidget(statusLabel_);
 
     loginButton_ = new QPushButton("连接并登录", this);
-    registerButton_ = new QPushButton("注册账号（待服务端 SDK API）", this);
+    registerButton_ = new QPushButton("注册账号", this);
     layout->addWidget(loginButton_);
     layout->addWidget(registerButton_);
     connect(loginButton_, &QPushButton::clicked, this, &LoginWindow::handleLogin);
-    connect(registerButton_, &QPushButton::clicked, this, &LoginWindow::handleRegisterHint);
+    connect(registerButton_, &QPushButton::clicked, this, &LoginWindow::handleRegister);
     connect(userEdit_, &QLineEdit::textChanged, this, [this](const QString& user) {
         tokenEdit_->setText("token:" + user);
     });
 }
 
 void LoginWindow::handleLogin() {
-    bool ok = false;
-    const auto port = portEdit_->text().toUShort(&ok);
-    if (!ok || port == 0) {
-        QMessageBox::warning(this, "端口无效", "Gateway port 必须是有效端口。");
+    if (!updateConfigFromForm()) {
         return;
     }
-
-    config_.host = hostEdit_->text();
-    config_.port = port;
 
     auto* mainWindow = new MainWindow(config_, userEdit_->text(), tokenEdit_->text());
     mainWindow->resize(1100, 720);
@@ -62,12 +57,45 @@ void LoginWindow::handleLogin() {
     close();
 }
 
-void LoginWindow::handleRegisterHint() {
-    QMessageBox::information(
-        this,
-        "注册能力说明",
-        "客户端已预留注册入口。当前公共 SDK 暂未暴露 register 通用 API，"
-        "后续应由服务端 SDK 补齐后在 GatewayClient::registerUser() 接入。");
+void LoginWindow::handleRegister() {
+    if (!updateConfigFromForm()) {
+        return;
+    }
+    const auto userId = userEdit_->text().trimmed();
+    const auto credential = tokenEdit_->text();
+    if (userId.isEmpty() || credential.isEmpty()) {
+        QMessageBox::warning(this, "注册信息无效", "用户 ID 和 Token/凭证不能为空。");
+        return;
+    }
+
+    GatewayClient gateway;
+    QString error;
+    setStatus("正在连接 gateway 并注册账号...");
+    if (!gateway.connectToGateway(config_, &error)) {
+        setStatus("注册失败：" + error);
+        QMessageBox::warning(this, "注册失败", error);
+        return;
+    }
+    if (!gateway.registerUser(userId, credential, userId, &error)) {
+        setStatus("注册失败：" + error);
+        QMessageBox::warning(this, "注册失败", error);
+        return;
+    }
+    setStatus("注册成功，可以直接登录：" + userId);
+    QMessageBox::information(this, "注册成功", "账号已注册，可以点击“连接并登录”。");
+}
+
+bool LoginWindow::updateConfigFromForm() {
+    bool ok = false;
+    const auto port = portEdit_->text().toUShort(&ok);
+    if (!ok || port == 0) {
+        QMessageBox::warning(this, "端口无效", "Gateway port 必须是有效端口。");
+        return false;
+    }
+
+    config_.host = hostEdit_->text().trimmed();
+    config_.port = port;
+    return true;
 }
 
 void LoginWindow::setStatus(const QString& text) {

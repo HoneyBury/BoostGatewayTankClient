@@ -101,16 +101,21 @@ QString GatewayClient::sdkVersion() const {
     return QString::fromUtf8(BOOST_GATEWAY_SDK_VERSION);
 }
 
-bool GatewayClient::registerUser(const QString&,
-                                 const QString&,
-                                 const QString&,
+bool GatewayClient::registerUser(const QString& userId,
+                                 const QString& credential,
+                                 const QString& displayName,
                                  QString* errorMessage) {
-    const auto message = unsupportedFeatureMessage("注册账号");
-    if (errorMessage) {
-        *errorMessage = message;
+    const auto result = client_->register_account(
+        toStdString(userId), toStdString(credential), toStdString(displayName), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "register failed");
+        return false;
     }
-    recordError(message);
-    return false;
+    recordEvent("registered: " + userId);
+    return true;
 }
 
 bool GatewayClient::login(const QString& userId, const QString& token, QString* errorMessage) {
@@ -163,6 +168,32 @@ bool GatewayClient::leaveRoom(const QString& roomId, QString* errorMessage) {
         return false;
     }
     recordEvent("left room: " + roomId);
+    return true;
+}
+
+bool GatewayClient::kickRoomMember(const QString& targetUserId, QString* errorMessage) {
+    const auto result = client_->room_kick(toStdString(targetUserId), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "room kick failed");
+        return false;
+    }
+    recordEvent("kicked room member: " + targetUserId);
+    return true;
+}
+
+bool GatewayClient::transferRoomOwner(const QString& newOwnerId, QString* errorMessage) {
+    const auto result = client_->room_transfer_owner(toStdString(newOwnerId), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "room owner transfer failed");
+        return false;
+    }
+    recordEvent("transferred room owner: " + newOwnerId);
     return true;
 }
 
@@ -285,6 +316,18 @@ QString GatewayClient::queryBattleState(const QString& battleId, QString* errorM
             *errorMessage = formatError(result.error_code, result.error_message);
         }
         recordError(errorMessage ? *errorMessage : "battle state failed");
+        return {};
+    }
+    return QString::fromStdString(result.response_body);
+}
+
+QString GatewayClient::loadReplay(const QString& battleId, QString* errorMessage) {
+    const auto result = client_->replay_load(toStdString(battleId), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "replay load failed");
         return {};
     }
     return QString::fromStdString(result.response_body);
