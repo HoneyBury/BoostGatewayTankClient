@@ -1,0 +1,20 @@
+build/
+cmake-build-*/
+.cache/
+.DS_Store
+*.user
+*.autosave
+*.log
+*.tmp
+
+# Runtime artifacts
+runtime/
+logs/
+
+# Qt Creator / IDE
+*.pro.user*
+CMakeLists.txt.user*
+
+# Local environment overrides
+.env
+local.env
