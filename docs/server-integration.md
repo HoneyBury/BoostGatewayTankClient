@@ -1,5 +1,9 @@
 # 服务端联调说明
 
+完整客户端部署、运行、打包和常见问题见
+[客户端部署与使用说明](client-deployment.md)。服务端部署快速入口见服务端仓库的
+`docs/deployment-quickstart.md`。
+
 ## 本地目录约定
 
 推荐服务端和客户端仓库放在同一级目录：
@@ -26,6 +30,16 @@ BGTC_GATEWAY_HOST=127.0.0.1 \
 BGTC_GATEWAY_PORT=9201 \
 ./build/local/boost_gateway_tank_client
 ```
+
+如果服务端使用 OrbStack / Docker Compose：
+
+```bash
+cd /Users/honeybury/workspace/BoostAsioDemo
+docker compose -f env/docker/docker-compose.yml up -d
+curl http://127.0.0.1:9080/health
+```
+
+客户端连接 `127.0.0.1:9201`。
 
 ## 两个仓库的职责
 

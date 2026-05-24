@@ -37,6 +37,7 @@ assets/       后续美术、音效、地图和 Qt resource
 ## 构建
 
 客户端使用 CMake + Qt Widgets。优先使用 Qt 6，也兼容 Qt 5。
+完整部署、运行和打包说明见 [docs/client-deployment.md](docs/client-deployment.md)。
 
 推荐开发方式是在同级目录保留服务端仓库：
 
@@ -80,6 +81,15 @@ BGTC_GATEWAY_PORT=9201 \
 ./build/local/boost_gateway_tank_client
 ```
 
+如果服务端使用 OrbStack / Docker Compose：
+
+```bash
+cd /Users/honeybury/workspace/BoostAsioDemo
+docker compose -f env/docker/docker-compose.yml up -d
+```
+
+客户端继续连接 `127.0.0.1:9201`。
+
 当前客户端状态：
 
 - 登录窗口：支持注册账号、连接登录、host、port、user id、token 输入。
@@ -110,6 +120,7 @@ BGTC_GATEWAY_PORT=9201 \
 - 正式发布阶段应使用安装后的 SDK prefix 或 SDK release artifact。
 
 详见 [docs/server-integration.md](docs/server-integration.md)。
+部署和日常使用见 [docs/client-deployment.md](docs/client-deployment.md)。
 
 ## 打包
 
