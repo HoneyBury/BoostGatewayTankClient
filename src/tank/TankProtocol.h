@@ -27,7 +27,10 @@ struct TankInput {
 };
 
 std::string encodeTankInput(const TankInput& input);
+std::string encodeLegacyMoveInput(int x, int y);
+std::string encodeLegacyFinishInput(const std::string& reason);
 std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload);
+std::optional<BattleStateEvent> decodeBattleStateEvent(const std::string& payload);
 
 TankInput makeMoveInput(std::uint64_t seq, int dx, int dy);
 TankInput makeFireInput(std::uint64_t seq, int direction);

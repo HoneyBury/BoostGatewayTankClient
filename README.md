@@ -1,79 +1,131 @@
 # BoostGateway Tank Client
 
-Qt/C++ multiplayer tank battle validation client for the BoostGateway realtime
-server framework.
+这是一个基于 Qt/C++ 的多人在线同屏坦克大战验证客户端，用于验证
+BoostGateway 实时服务框架、C++ SDK、房间大厅、战斗同步、排行榜、回放
+等完整业务链路。
 
-This repository is intentionally separate from the server repository.  The
-client consumes the public C++ SDK and tank protocol contracts, while Qt,
-desktop UI code, packaging, and assets stay here.
+本仓库刻意与服务端仓库拆分。服务端仓库继续负责 gateway、SDK、实时运行
+时、房间、战斗、排行榜等基础能力；客户端仓库只消费公开 SDK、协议文档
+和联调约定，Qt UI、桌面端打包、素材和交互逻辑都留在本仓库内，避免把
+Qt 依赖污染到服务端主工程。
 
-## Goals
+## 项目目标
 
-- Provide a real player-facing validation client for the tank battle demo.
-- Verify same-screen multiplayer state sync through server push snapshots.
-- Exercise registration/login, room lobby, ready, battle, reconnect, replay,
-  leaderboard, and future item/power-up flows.
-- Keep game-specific UI and tank business adapters out of the server framework.
+- 提供一个真实玩家可操作的多人同屏坦克大战验证客户端。
+- 验证服务端 push snapshot 下的多人状态同步。
+- 覆盖注册/登录、房间大厅、创建房间、加入房间、准备、开始战斗、输入、
+  断线重连、结算、排行榜、回放和后续道具机制。
+- 保持 SDK 通用性，不把 `tank_move()`、`tank_fire()` 这类业务接口写入
+  公共 SDK。
+- 为后续服务端/客户端联调提供清晰的版本、协议和验证边界。
 
-## Repository Layout
+## 目录结构
 
 ```text
-cmake/        CMake helpers for importing BoostGateway SDK
-docs/         architecture, integration, production planning
-src/app/      application entry point
-src/core/     config and session state
-src/sdk/      Qt-friendly facade over boost_gateway::sdk::SdkClient
-src/tank/     tank input/snapshot protocol adapter
-src/ui/       Qt Widgets windows and rendering widgets
-tests/        lightweight client-side smoke tests
-scripts/      local build and integration helper scripts
-assets/       future images, sounds, maps, and Qt resources
+cmake/        SDK 导入与 CMake 辅助脚本
+docs/         架构、协议、联调和生产规划文档
+src/app/      应用入口
+src/core/     配置、会话状态和通用模型
+src/sdk/      面向 Qt 的 SDK facade
+src/tank/     坦克业务协议适配与客户端模型
+src/ui/       Qt Widgets 窗口与渲染控件
+tests/        客户端侧轻量 smoke test
+scripts/      本地构建和运行脚本
+assets/       后续美术、音效、地图和 Qt resource
 ```
 
-## Build
+## 构建
 
-The client uses CMake and Qt Widgets.  Qt 6 is preferred; Qt 5 is accepted.
+客户端使用 CMake + Qt Widgets。优先使用 Qt 6，也兼容 Qt 5。
 
-From this repository:
+推荐开发方式是在同级目录保留服务端仓库：
+
+```text
+/Users/honeybury/workspace/BoostAsioDemo
+/Users/honeybury/workspace/BoostGatewayTankClient
+```
+
+构建命令：
 
 ```bash
-cmake -S . -B build \
-  -DBOOST_GATEWAY_SERVER_ROOT=/Users/honeybury/workspace/BoostAsioDemo
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake -S . -B build/local \
+  -DBOOST_GATEWAY_SERVER_ROOT=/Users/honeybury/workspace/BoostAsioDemo \
+  -DBOOST_GATEWAY_SERVER_BUILD_DIR=/Users/honeybury/workspace/BoostAsioDemo/build
+cmake --build build/local
+ctest --test-dir build/local --output-on-failure
 ```
 
-If the SDK is installed or exported elsewhere, pass:
+也可以运行一键本地验证脚本：
 
 ```bash
-cmake -S . -B build -DBOOST_GATEWAY_SDK_DIR=/path/to/sdk/prefix/or/build/sdk
+./scripts/verify-client-local.sh
 ```
 
-## Run
-
-Start the BoostGateway server stack first, then run:
+如果 SDK 已经被单独安装或导出，可以直接指定 SDK 目录：
 
 ```bash
-BGTC_GATEWAY_HOST=127.0.0.1 BGTC_GATEWAY_PORT=9201 ./build/boost_gateway_tank_client
+cmake -S . -B build/local \
+  -DBOOST_GATEWAY_SDK_DIR=/path/to/boost-gateway-sdk
 ```
 
-Current UI status:
+## 运行
 
-- Login window: host/port/user/token input.
-- Lobby window: create room, join room, ready, start battle, leave room,
-  leaderboard query.
-- Battle window: grid renderer, tank/bullet snapshot rendering, WASD/arrows
-  movement, space fire.
+先启动 BoostGateway 服务端栈，再运行客户端：
 
-The first milestone is a playable verification MVP, not final game art.
+```bash
+BGTC_GATEWAY_HOST=127.0.0.1 \
+BGTC_GATEWAY_PORT=9201 \
+./build/local/boost_gateway_tank_client
+```
 
-## Compatibility
+当前客户端状态：
 
-Current expected server-side boundary:
+- 登录窗口：支持 host、port、user id、token 输入。
+- 大厅窗口：支持创建房间、加入房间、准备、开始战斗、离开房间、查询排行榜。
+- 战斗窗口：支持网格渲染、坦克/子弹 snapshot 渲染、WASD/方向键移动、空格开火。
+- Headless gate：支持对运行中的 gateway 执行双客户端房间战斗闭环验证。
 
-- BoostGateway SDK native major: `4.x`
-- Gateway demo flow: login -> room -> ready -> battle -> push -> leaderboard
-- Tank payloads: see [docs/protocol.md](docs/protocol.md)
+当前阶段目标是“可验证可联调的 MVP”，不是最终美术品质。
 
-The client should not include server framework source files.  Use SDK packages,
-CMake package config, and protocol documents as the integration contract.
+## 与服务端的关系
+
+客户端不复制服务端源码。当前 SDK 导入策略如下：
+
+- 优先通过 `boost_gateway_sdk` CMake package config 消费 SDK。
+- 若服务端 build-tree package config 不完整，则开发期 fallback 到服务端已有
+  `libboost_gateway_sdk.a` 和 SDK headers。
+- 正式发布阶段应使用安装后的 SDK prefix 或 SDK release artifact。
+
+详见 [docs/server-integration.md](docs/server-integration.md)。
+
+## Headless 联调
+
+服务端 gateway 启动后：
+
+```bash
+BGTC_GATEWAY_HOST=127.0.0.1 \
+BGTC_GATEWAY_PORT=9201 \
+./scripts/run-headless-gate.sh
+```
+
+该脚本会运行 `tank_headless_gate`，执行双客户端 login、房间、ready、battle、
+input、finish、leaderboard 验证，并输出 `tank-client-headless-summary.json`。
+
+如果希望脚本自动启动服务端 login、room、battle、match、leaderboard 和
+gateway，并使用动态端口完成真实闭环验证，可以运行：
+
+```bash
+./scripts/run-live-gate.sh \
+  --server-root /Users/honeybury/workspace/BoostAsioDemo \
+  --server-build-dir /Users/honeybury/workspace/BoostAsioDemo/build
+```
+
+该脚本会在构建客户端前重新配置 `BOOST_GATEWAY_SERVER_BUILD_DIR`，确保
+headless gate 链接到当前服务端 build 目录中的 SDK，避免客户端 SDK 与运行中
+gateway 协议不一致。
+
+## 下一步
+
+整体路线以“真实多人同屏可玩”为主线，优先补齐真实服务端联调、房间大厅、
+战斗 snapshot push、输入闭环、断线重连、排行榜和回放。详细规划见
+[docs/production-roadmap.md](docs/production-roadmap.md)。

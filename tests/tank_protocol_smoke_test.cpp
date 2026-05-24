@@ -15,6 +15,12 @@ int main() {
     assert(snapshot->tanks.size() == 1);
     assert(snapshot->tanks[0].userId == "alice");
 
+    const auto battleState = bgtc::decodeBattleStateEvent(
+        "battle_state:kind=frame:room_id=r1:battle_id=b1:frame=12:trigger=tick");
+    assert(battleState.has_value());
+    assert(battleState->kind == "frame");
+    assert(battleState->frame == 12);
+
     std::cout << "tank protocol smoke test passed\n";
     return 0;
 }

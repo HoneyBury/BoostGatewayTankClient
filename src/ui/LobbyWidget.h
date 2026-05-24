@@ -9,6 +9,7 @@
 class QLabel;
 class QLineEdit;
 class QTextEdit;
+class QListWidget;
 
 namespace bgtc {
 
@@ -20,20 +21,26 @@ public:
 
 signals:
     void battleStarted(QString battleId);
+    void leaderboardRequested();
 
 private:
     void createRoom();
     void joinRoom();
     void leaveRoom();
     void setReady();
+    void unsetReady();
     void startBattle();
     void refreshLeaderboard();
+    void showUnsupportedRoomList();
+    void showUnsupportedRoomAdmin();
     void appendLog(const QString& text);
 
     AppConfig config_;
     ClientSession& session_;
     GatewayClient& gateway_;
     QLineEdit* roomEdit_ = nullptr;
+    QLabel* roomState_ = nullptr;
+    QListWidget* roomList_ = nullptr;
     QTextEdit* log_ = nullptr;
 };
 

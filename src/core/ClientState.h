@@ -8,6 +8,7 @@ enum class ConnectionState {
     Disconnected,
     Connecting,
     Connected,
+    Registering,
     LoggedIn,
     InLobby,
     InRoom,
@@ -20,6 +21,7 @@ struct ClientSession {
     QString displayName;
     QString roomId;
     QString battleId;
+    bool ready = false;
     ConnectionState state = ConnectionState::Disconnected;
 };
 

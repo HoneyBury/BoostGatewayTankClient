@@ -8,11 +8,16 @@
 
 class QStackedWidget;
 class QLabel;
+class QListWidget;
 
 namespace bgtc {
 
 class LobbyWidget;
 class BattleWidget;
+class DiagnosticsWidget;
+class LeaderboardWidget;
+class ReplayWidget;
+class SettingsWidget;
 
 class MainWindow final : public QMainWindow {
     Q_OBJECT
@@ -22,14 +27,22 @@ public:
 
 private:
     void connectAndLogin(const QString& token);
+    void reconnect();
     void setStatus(const QString& text);
+    void showPage(int index);
 
     AppConfig config_;
+    QString token_;
     ClientSession session_;
     GatewayClient gateway_;
+    QListWidget* navigation_ = nullptr;
     QStackedWidget* stack_ = nullptr;
     LobbyWidget* lobby_ = nullptr;
     BattleWidget* battle_ = nullptr;
+    LeaderboardWidget* leaderboard_ = nullptr;
+    ReplayWidget* replay_ = nullptr;
+    DiagnosticsWidget* diagnostics_ = nullptr;
+    SettingsWidget* settings_ = nullptr;
     QLabel* statusLabel_ = nullptr;
 };
 

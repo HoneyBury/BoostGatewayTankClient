@@ -24,11 +24,13 @@ protected:
 private:
     void sendMove(int dx, int dy);
     void sendFire(int direction);
+    void drawPanel(QPainter& painter);
 
     ClientSession& session_;
     GatewayClient& gateway_;
     TankSnapshot snapshot_;
     std::uint64_t nextSeq_ = 1;
+    QString lastInputError_;
 };
 
 }  // namespace bgtc

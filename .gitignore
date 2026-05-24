@@ -12,6 +12,8 @@ runtime/
 logs/
 
 # Qt Creator / IDE
+.idea/
+.vscode/
 *.pro.user*
 CMakeLists.txt.user*
 

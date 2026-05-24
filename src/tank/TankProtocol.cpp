@@ -2,6 +2,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <sstream>
+
 namespace bgtc {
 namespace {
 
@@ -42,6 +44,49 @@ TankEvent parseEvent(const json& value) {
     return event;
 }
 
+ItemState parseItem(const json& value) {
+    ItemState item;
+    item.id = value.value("id", "");
+    item.type = value.value("type", "");
+    item.x = value.value("x", 0);
+    item.y = value.value("y", 0);
+    item.remainingTicks = value.value("remaining_ticks", 0);
+    return item;
+}
+
+std::vector<std::string> split(const std::string& value, char delimiter) {
+    std::vector<std::string> parts;
+    std::stringstream ss(value);
+    std::string item;
+    while (std::getline(ss, item, delimiter)) {
+        parts.push_back(item);
+    }
+    return parts;
+}
+
+std::optional<BattleStateEvent> parseBattleStateSegments(const std::string& payload) {
+    if (payload.rfind("battle_state:", 0) != 0) {
+        return std::nullopt;
+    }
+    BattleStateEvent event;
+    for (const auto& segment : split(payload.substr(std::string("battle_state:").size()), ':')) {
+        const auto pos = segment.find('=');
+        if (pos == std::string::npos) {
+            continue;
+        }
+        const auto key = segment.substr(0, pos);
+        const auto value = segment.substr(pos + 1);
+        if (key == "kind") event.kind = value;
+        else if (key == "room_id") event.roomId = value;
+        else if (key == "battle_id") event.battleId = value;
+        else if (key == "frame") event.frame = std::stoi(value);
+        else if (key == "trigger") event.trigger = value;
+        else if (key == "reason") event.reason = value;
+        else if (key == "user_id") event.userId = value;
+    }
+    return event;
+}
+
 }  // namespace
 
 std::string encodeTankInput(const TankInput& input) {
@@ -69,7 +114,24 @@ std::string encodeTankInput(const TankInput& input) {
     return json{{"seq", input.seq}, {"actions", std::move(actions)}}.dump();
 }
 
+std::string encodeLegacyMoveInput(int x, int y) {
+    return "move:" + std::to_string(x) + "," + std::to_string(y);
+}
+
+std::string encodeLegacyFinishInput(const std::string& reason) {
+    return "finish:" + reason;
+}
+
 std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload) {
+    if (auto battleState = decodeBattleStateEvent(payload)) {
+        TankSnapshot snapshot;
+        snapshot.frame = battleState->frame;
+        snapshot.finished = battleState->kind == "finished" || battleState->kind == "settlement";
+        snapshot.finishReason = battleState->reason;
+        snapshot.battleState = *battleState;
+        return snapshot;
+    }
+
     auto doc = json::parse(payload, nullptr, false);
     if (doc.is_discarded() || !doc.is_object()) {
         return std::nullopt;
@@ -104,7 +166,39 @@ std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload) {
             snapshot.events.push_back(parseEvent(event));
         }
     }
+    if (doc.contains("items") && doc["items"].is_array()) {
+        for (const auto& item : doc["items"]) {
+            snapshot.items.push_back(parseItem(item));
+        }
+    }
     return snapshot;
+}
+
+std::optional<BattleStateEvent> decodeBattleStateEvent(const std::string& payload) {
+    if (auto parsed = parseBattleStateSegments(payload)) {
+        return parsed;
+    }
+
+    auto doc = json::parse(payload, nullptr, false);
+    if (doc.is_discarded() || !doc.is_object()) {
+        return std::nullopt;
+    }
+    if (doc.contains("payload") && doc["payload"].is_string()) {
+        return decodeBattleStateEvent(doc["payload"].get<std::string>());
+    }
+    const auto kind = doc.value("kind", "");
+    if (kind.empty()) {
+        return std::nullopt;
+    }
+    BattleStateEvent event;
+    event.kind = kind;
+    event.roomId = doc.value("room_id", "");
+    event.battleId = doc.value("battle_id", "");
+    event.frame = doc.value("frame", 0);
+    event.trigger = doc.value("trigger", "");
+    event.reason = doc.value("reason", "");
+    event.userId = doc.value("user_id", "");
+    return event;
 }
 
 TankInput makeMoveInput(std::uint64_t seq, int dx, int dy) {

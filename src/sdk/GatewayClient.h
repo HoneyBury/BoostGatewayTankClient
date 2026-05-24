@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/AppConfig.h"
+#include "core/Diagnostics.h"
 #include "tank/TankProtocol.h"
 
 #include <boost_gateway/sdk/client.h>
@@ -20,8 +21,20 @@ public:
     ~GatewayClient() override;
 
     bool connectToGateway(const AppConfig& config, QString* errorMessage = nullptr);
+    bool reconnectToGateway(const AppConfig& config,
+                            const QString& userId,
+                            const QString& token,
+                            QString* errorMessage = nullptr);
     void disconnectFromGateway();
 
+    [[nodiscard]] bool isConnected() const;
+    [[nodiscard]] ClientDiagnostics diagnostics() const;
+    [[nodiscard]] QString sdkVersion() const;
+
+    bool registerUser(const QString& userId,
+                      const QString& credential,
+                      const QString& displayName,
+                      QString* errorMessage = nullptr);
     bool login(const QString& userId, const QString& token, QString* errorMessage = nullptr);
     bool createRoom(const QString& roomId, QString* errorMessage = nullptr);
     bool joinRoom(const QString& roomId, QString* errorMessage = nullptr);
@@ -29,18 +42,28 @@ public:
     bool setReady(bool ready, QString* errorMessage = nullptr);
     bool startBattle(const QString& roomId, QString* battleId, QString* errorMessage = nullptr);
     bool sendTankInput(const TankInput& input, QString* errorMessage = nullptr);
+    bool sendLegacyMoveInput(int x, int y, QString* errorMessage = nullptr);
+    bool sendFinishInput(const QString& reason, QString* errorMessage = nullptr);
     QString queryLeaderboardTop(std::size_t limit, QString* errorMessage = nullptr);
+    QString queryLeaderboardRank(const QString& userId, QString* errorMessage = nullptr);
+
+    [[nodiscard]] QString unsupportedFeatureMessage(const QString& feature) const;
 
 signals:
     void pushReceived(QString body);
     void tankSnapshotReceived(bgtc::TankSnapshot snapshot);
     void disconnected();
+    void diagnosticsChanged(bgtc::ClientDiagnostics diagnostics);
 
 private:
     static QString formatError(std::int32_t code, const std::string& message);
     void installCallbacks();
+    void recordError(const QString& error);
+    void recordEvent(const QString& event);
+    void publishDiagnostics();
 
     std::unique_ptr<boost_gateway::sdk::SdkClient> client_;
+    ClientDiagnostics diagnostics_;
 };
 
 }  // namespace bgtc

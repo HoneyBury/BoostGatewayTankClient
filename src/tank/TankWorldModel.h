@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,24 @@ struct TankEvent {
     int frame = 0;
 };
 
+struct ItemState {
+    std::string id;
+    std::string type;
+    int x = 0;
+    int y = 0;
+    int remainingTicks = 0;
+};
+
+struct BattleStateEvent {
+    std::string kind;
+    std::string roomId;
+    std::string battleId;
+    int frame = 0;
+    std::string trigger;
+    std::string reason;
+    std::string userId;
+};
+
 struct TankSnapshot {
     int frame = 0;
     bool finished = false;
@@ -43,6 +62,8 @@ struct TankSnapshot {
     std::vector<TankState> tanks;
     std::vector<BulletState> bullets;
     std::vector<TankEvent> events;
+    std::vector<ItemState> items;
+    std::optional<BattleStateEvent> battleState;
 };
 
 }  // namespace bgtc

@@ -18,6 +18,7 @@ public:
 
 private:
     void handleLogin();
+    void handleRegisterHint();
     void setStatus(const QString& text);
 
     AppConfig config_;
@@ -27,6 +28,7 @@ private:
     QLineEdit* tokenEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
     QPushButton* loginButton_ = nullptr;
+    QPushButton* registerButton_ = nullptr;
 };
 
 }  // namespace bgtc

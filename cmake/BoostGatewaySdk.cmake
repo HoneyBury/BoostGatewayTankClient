@@ -1,4 +1,5 @@
 set(BOOST_GATEWAY_SERVER_ROOT "" CACHE PATH "Path to the BoostGateway server repository")
+set(BOOST_GATEWAY_SERVER_BUILD_DIR "" CACHE PATH "Path to the BoostGateway server build directory")
 set(BOOST_GATEWAY_SDK_DIR "" CACHE PATH "Path to a directory containing boost_gateway_sdk-config.cmake")
 
 set(_bgtc_sdk_found OFF)
@@ -12,11 +13,19 @@ if(BOOST_GATEWAY_SDK_DIR
 endif()
 
 if(NOT _bgtc_sdk_found AND BOOST_GATEWAY_SERVER_ROOT)
-    foreach(_candidate
+    set(_bgtc_sdk_package_candidates)
+    if(BOOST_GATEWAY_SERVER_BUILD_DIR)
+        list(APPEND _bgtc_sdk_package_candidates "${BOOST_GATEWAY_SERVER_BUILD_DIR}/sdk")
+    endif()
+    list(APPEND _bgtc_sdk_package_candidates
         "${BOOST_GATEWAY_SERVER_ROOT}/build/sdk"
         "${BOOST_GATEWAY_SERVER_ROOT}/build/release/sdk"
         "${BOOST_GATEWAY_SERVER_ROOT}/build/default/sdk"
         "${BOOST_GATEWAY_SERVER_ROOT}/runtime/sdk-package-prefix"
+    )
+
+    foreach(_candidate
+        IN LISTS _bgtc_sdk_package_candidates
     )
         if(EXISTS "${_candidate}/boost_gateway_sdk-config.cmake"
            AND EXISTS "${_candidate}/boost_gateway_sdk-targets.cmake")
@@ -30,10 +39,18 @@ if(NOT _bgtc_sdk_found AND BOOST_GATEWAY_SERVER_ROOT)
 endif()
 
 if(NOT _bgtc_sdk_found AND BOOST_GATEWAY_SERVER_ROOT)
-    foreach(_build_dir
+    set(_bgtc_sdk_build_candidates)
+    if(BOOST_GATEWAY_SERVER_BUILD_DIR)
+        list(APPEND _bgtc_sdk_build_candidates "${BOOST_GATEWAY_SERVER_BUILD_DIR}/sdk")
+    endif()
+    list(APPEND _bgtc_sdk_build_candidates
         "${BOOST_GATEWAY_SERVER_ROOT}/build/sdk"
         "${BOOST_GATEWAY_SERVER_ROOT}/build/release/sdk"
         "${BOOST_GATEWAY_SERVER_ROOT}/build/default/sdk"
+    )
+
+    foreach(_build_dir
+        IN LISTS _bgtc_sdk_build_candidates
     )
         if(EXISTS "${_build_dir}/libboost_gateway_sdk.a")
             set(_bgtc_sdk_lib "${_build_dir}/libboost_gateway_sdk.a")
@@ -48,6 +65,7 @@ if(NOT _bgtc_sdk_found AND BOOST_GATEWAY_SERVER_ROOT)
         if(NOT TARGET nlohmann_json::nlohmann_json)
             find_path(_bgtc_json_include nlohmann/json.hpp
                 PATHS
+                    "${BOOST_GATEWAY_SERVER_BUILD_DIR}/_deps/nlohmann_json-src/include"
                     "${BOOST_GATEWAY_SERVER_ROOT}/build/_deps/nlohmann_json-src/include"
                     "${BOOST_GATEWAY_SERVER_ROOT}/build/build/_deps/nlohmann_json-src/include"
                     "${BOOST_GATEWAY_SERVER_ROOT}/build/default/_deps/nlohmann_json-src/include"
