@@ -10,6 +10,7 @@ class QLabel;
 class QLineEdit;
 class QTextEdit;
 class QListWidget;
+class QListWidgetItem;
 
 namespace bgtc {
 
@@ -31,10 +32,13 @@ private:
     void unsetReady();
     void startBattle();
     void refreshLeaderboard();
-    void showUnsupportedRoomList();
+    void refreshRoomList();
+    void refreshRoomDetail();
     void showUnsupportedRoomAdmin();
     void appendLog(const QString& text);
     void refreshRoomSummary();
+    void selectRoomFromList(QListWidgetItem* item);
+    void renderRoomList(const QString& body);
     [[nodiscard]] bool requireRoom(const QString& action);
 
     AppConfig config_;

@@ -251,6 +251,45 @@ bool GatewayClient::sendFinishInput(const QString& reason, QString* errorMessage
     return true;
 }
 
+QString GatewayClient::queryRoomList(std::size_t page,
+                                     std::size_t pageSize,
+                                     const QString& status,
+                                     QString* errorMessage) {
+    const auto result = client_->room_list(page, pageSize, toStdString(status), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "room list failed");
+        return {};
+    }
+    return QString::fromStdString(result.response_body);
+}
+
+QString GatewayClient::queryRoomDetail(const QString& roomId, QString* errorMessage) {
+    const auto result = client_->room_detail(toStdString(roomId), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "room detail failed");
+        return {};
+    }
+    return QString::fromStdString(result.response_body);
+}
+
+QString GatewayClient::queryBattleState(const QString& battleId, QString* errorMessage) {
+    const auto result = client_->battle_state(toStdString(battleId), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "battle state failed");
+        return {};
+    }
+    return QString::fromStdString(result.response_body);
+}
+
 QString GatewayClient::queryLeaderboardTop(std::size_t limit, QString* errorMessage) {
     const auto result = client_->leaderboard_top(limit, kDefaultTimeout);
     if (!result.ok) {

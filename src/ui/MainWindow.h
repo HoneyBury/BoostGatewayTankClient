@@ -32,6 +32,8 @@ private:
     void setStatus(const QString& text);
     void showPage(int index);
     void handleTankSnapshot(const bgtc::TankSnapshot& snapshot);
+    bool restoreBattleSnapshot();
+    QString activeBattleIdFromRoomDetail(const QString& roomId);
 
     AppConfig config_;
     QString token_;

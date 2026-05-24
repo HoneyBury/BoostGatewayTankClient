@@ -2,9 +2,13 @@
 
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QListWidgetItem>
 #include <QPushButton>
 #include <QTextEdit>
 #include <QVBoxLayout>
@@ -31,7 +35,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     layout->addWidget(roomState_);
 
     capabilityState_ = new QLabel(
-        "当前可用：创建、加入、离开、准备、开始战斗。房间列表/详情/房主管理仍等待服务端 SDK API。",
+        "当前可用：创建、加入、离开、准备、开始战斗、房间列表、房间详情。房主管理仍等待服务端 SDK API。",
         this);
     capabilityState_->setObjectName("PageHint");
     capabilityState_->setWordWrap(true);
@@ -45,6 +49,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     row->setHorizontalSpacing(10);
     row->setVerticalSpacing(10);
     auto* listButton = new QPushButton("刷新房间列表", this);
+    auto* detailButton = new QPushButton("房间详情", this);
     auto* createButton = new QPushButton("创建房间", this);
     auto* joinButton = new QPushButton("加入房间", this);
     auto* readyButton = new QPushButton("准备", this);
@@ -61,14 +66,15 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     row->addWidget(unreadyButton, 1, 0);
     row->addWidget(leaveButton, 1, 1);
     row->addWidget(listButton, 1, 2);
-    row->addWidget(adminButton, 1, 3);
-    row->addWidget(leaderboardButton, 1, 4);
+    row->addWidget(detailButton, 1, 3);
+    row->addWidget(adminButton, 1, 4);
+    row->addWidget(leaderboardButton, 1, 5);
     row->setColumnStretch(4, 1);
     layout->addLayout(row);
 
     roomList_ = new QListWidget(this);
-    roomList_->addItem("操作提示：手动输入 room_id 后可以创建或加入房间。");
-    roomList_->addItem("能力提示：房间列表、房间详情、邀请/踢人将在服务端 API 可用后接入。");
+    roomList_->addItem("点击“刷新房间列表”从 gateway 查询真实房间。");
+    roomList_->addItem("选中房间后会自动填入 room_id，可直接加入或查看详情。");
     layout->addWidget(roomList_);
 
     log_ = new QTextEdit(this);
@@ -76,7 +82,8 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     log_->setPlaceholderText("房间事件、推送消息和错误提示会显示在这里。");
     layout->addWidget(log_);
 
-    connect(listButton, &QPushButton::clicked, this, &LobbyWidget::showUnsupportedRoomList);
+    connect(listButton, &QPushButton::clicked, this, &LobbyWidget::refreshRoomList);
+    connect(detailButton, &QPushButton::clicked, this, &LobbyWidget::refreshRoomDetail);
     connect(createButton, &QPushButton::clicked, this, &LobbyWidget::createRoom);
     connect(joinButton, &QPushButton::clicked, this, &LobbyWidget::joinRoom);
     connect(readyButton, &QPushButton::clicked, this, &LobbyWidget::setReady);
@@ -85,6 +92,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     connect(leaveButton, &QPushButton::clicked, this, &LobbyWidget::leaveRoom);
     connect(adminButton, &QPushButton::clicked, this, &LobbyWidget::showUnsupportedRoomAdmin);
     connect(leaderboardButton, &QPushButton::clicked, this, &LobbyWidget::refreshLeaderboard);
+    connect(roomList_, &QListWidget::itemClicked, this, &LobbyWidget::selectRoomFromList);
     connect(&gateway_, &GatewayClient::pushReceived, this, &LobbyWidget::appendLog);
 }
 
@@ -179,11 +187,28 @@ void LobbyWidget::refreshLeaderboard() {
     emit leaderboardRequested();
 }
 
-void LobbyWidget::showUnsupportedRoomList() {
-    roomList_->clear();
-    roomList_->addItem("房间列表暂不可用：等待服务端 SDK 暴露 list_rooms/page/filter API。");
-    roomList_->addItem("当前可用路径：复制或输入 room_id 后创建/加入房间。");
-    appendLog(gateway_.unsupportedFeatureMessage("房间列表/分页/过滤"));
+void LobbyWidget::refreshRoomList() {
+    QString error;
+    const auto body = gateway_.queryRoomList(1, 50, {}, &error);
+    if (!error.isEmpty()) {
+        appendLog("刷新房间列表失败：" + error);
+        roomList_->clear();
+        roomList_->addItem("房间列表查询失败，请确认服务端 gateway/backend 已更新。");
+        return;
+    }
+    renderRoomList(body);
+    appendLog("房间列表已刷新。");
+}
+
+void LobbyWidget::refreshRoomDetail() {
+    const auto roomId = roomEdit_->text().trimmed();
+    if (roomId.isEmpty()) {
+        appendLog("查询房间详情失败：请先输入或选择 room_id。");
+        return;
+    }
+    QString error;
+    const auto body = gateway_.queryRoomDetail(roomId, &error);
+    appendLog(error.isEmpty() ? "房间详情：" + body : "查询房间详情失败：" + error);
 }
 
 void LobbyWidget::showUnsupportedRoomAdmin() {
@@ -203,6 +228,45 @@ void LobbyWidget::refreshRoomSummary() {
     const auto battleText = session_.battleId.isEmpty() ? "未开始战斗" : "战斗：" + session_.battleId;
     roomState_->setText(QString("当前房间：%1    状态：%2    %3")
                             .arg(session_.roomId, readyText, battleText));
+}
+
+void LobbyWidget::selectRoomFromList(QListWidgetItem* item) {
+    if (item == nullptr) {
+        return;
+    }
+    const auto roomId = item->data(Qt::UserRole).toString();
+    if (!roomId.isEmpty()) {
+        roomEdit_->setText(roomId);
+        appendLog("已选择房间：" + roomId);
+    }
+}
+
+void LobbyWidget::renderRoomList(const QString& body) {
+    roomList_->clear();
+    const auto doc = QJsonDocument::fromJson(body.toUtf8());
+    if (doc.isNull() || !doc.isObject()) {
+        roomList_->addItem("房间列表返回无法解析：" + body.left(120));
+        return;
+    }
+
+    const auto root = doc.object();
+    const auto rooms = root.value("rooms").toArray();
+    if (rooms.isEmpty()) {
+        roomList_->addItem("暂无房间。可以创建一个新房间。");
+        return;
+    }
+
+    for (const auto& value : rooms) {
+        const auto room = value.toObject();
+        const auto roomId = room.value("room_id").toString(room.value("id").toString());
+        const auto owner = room.value("owner_user_id").toString(room.value("owner").toString("unknown"));
+        const auto status = room.value("status").toString("unknown");
+        const auto members = room.value("members").toArray().size();
+        auto* item = new QListWidgetItem(
+            QString("%1 | %2人 | owner=%3 | %4").arg(roomId).arg(members).arg(owner, status),
+            roomList_);
+        item->setData(Qt::UserRole, roomId);
+    }
 }
 
 bool LobbyWidget::requireRoom(const QString& action) {

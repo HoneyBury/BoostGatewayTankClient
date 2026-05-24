@@ -130,16 +130,17 @@
 
 ## 当前代码落地状态
 
-- P1 已有登录、大厅、创建/加入/离开、ready/unready、排行榜查询入口；大厅会
-  明确展示当前 SDK 可用能力和房间列表/详情/房主管理等服务端 API 缺口。注册、
-  房间列表、房间详情、踢人和转让房主仍等待服务端 SDK 暴露通用 API。
+- P1 已有登录、大厅、创建/加入/离开、ready/unready、房间列表、房间详情和
+  排行榜查询入口；房间列表/详情已通过 SDK 与真实 live gate 验证。注册、踢人
+  和转让房主仍等待服务端 SDK 暴露通用 API。
 - P2 已有战斗页、键盘输入、snapshot 渲染、子弹/道具预留和基础战斗指标；
   已兼容当前服务端 `battle_state:kind=...`、`frame_advanced` 和
   `battle_finished` push。Qt UI 的 WASD/方向键已切到真实服务端 `move:x,y`
   输入，空格使用 `attack:user_id`，F 使用 `finish:reason`。
 - P3 已有 heartbeat 启动、disconnect callback、菜单重连入口、重连次数诊断、
   `SessionResumedPush` / `SessionKickedPush` 处理和本地 room/battle 上下文弱恢复；
-  主动查询 resume snapshot、room detail、battle state 仍需要服务端/SDK API 明确。
+  room detail 已可用于大厅恢复辅助，battle state 查询已接入重连后的主动 snapshot
+  恢复。后续需要补真断线自动化场景和更细的恢复错误提示。
 - P4 已有排行榜页、结算摘要和回放页占位；排行榜 top/rank 走 SDK，战斗结束后
   会自动刷新最近一局结算和排行榜。回放查询等待 SDK API。
 - P5 已有道具 snapshot 模型和渲染占位，具体道具协议等待服务端协议稳定。
@@ -154,8 +155,8 @@
 当前优先级 1/2/3 的客户端侧已经完成一轮可验证收束：
 
 - 房间链路：现有 SDK 支持的 create/join/leave/ready/start 已接入 UI 和 headless gate。
-- 大厅真实化：UI 会阻止未进房时 ready/start/leave 等无效操作，并明确提示房间
-  列表、房间详情、房主管理 API 尚未由 SDK 暴露。
+- 大厅真实化：UI 会阻止未进房时 ready/start/leave 等无效操作；房间列表和
+  房间详情已走 SDK 访问真实 gateway/backend，房主管理 API 尚未由 SDK 暴露。
 - 战斗联调：客户端可识别现有服务端 `battle_state` 和 `frame_advanced`
   push，并能发送现有 SDK 主链使用的 `move:x,y`、`attack:user_id` 和
   `finish:reason` 输入。
@@ -164,6 +165,7 @@
 - 结算排行榜：客户端可解析 `battle_finished` 的 winner、reason、total_frames 和
   scores，战斗结束后自动切到排行榜页并刷新展示。
 - P3 弱恢复：客户端可识别服务端 resumed/kicked push，重连后恢复本地 room/battle
-  导航上下文；完整恢复还需要服务端 SDK 暴露 room detail / battle state 查询。
+  导航上下文，并通过服务端 SDK `battle_state` 查询恢复最新 authoritative snapshot；
+  后续要把该能力放入真断线 UI 自动化 gate。
 - 自动化：`tank_protocol_smoke_test` 覆盖协议解析，`tank_ui_smoke_test` 覆盖离线
   Qt Widgets 构造和战斗快照渲染，`tank_headless_gate` 覆盖真实 gateway 业务闭环。

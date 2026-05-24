@@ -8,6 +8,8 @@
 #include "ui/SettingsWidget.h"
 
 #include <QHBoxLayout>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
 #include <QMenuBar>
@@ -208,8 +210,14 @@ void MainWindow::reconnect() {
         setStatus("重连失败，请稍后再试。");
         return;
     }
+    if (restoreBattleSnapshot()) {
+        session_.state = ConnectionState::InBattle;
+        navigation_->setCurrentRow(1);
+        setStatus("重连成功，已从服务端恢复最新战斗 snapshot。");
+        return;
+    }
     session_.state = session_.battleId.isEmpty() ? ConnectionState::InLobby : ConnectionState::InBattle;
-    setStatus("重连成功，已恢复本地上下文；完整 room/battle snapshot 恢复等待服务端 SDK API。");
+    setStatus("重连成功，已恢复本地上下文；当前没有可查询的 battle snapshot。");
 }
 
 void MainWindow::setStatus(const QString& text) {
@@ -250,6 +258,49 @@ void MainWindow::handleTankSnapshot(const TankSnapshot& snapshot) {
     if (navigation_ != nullptr) {
         navigation_->setCurrentRow(2);
     }
+}
+
+QString MainWindow::activeBattleIdFromRoomDetail(const QString& roomId) {
+    if (roomId.isEmpty()) {
+        return {};
+    }
+    QString error;
+    const auto body = gateway_.queryRoomDetail(roomId, &error);
+    if (!error.isEmpty() || body.isEmpty()) {
+        return {};
+    }
+    const auto doc = QJsonDocument::fromJson(body.toUtf8());
+    if (!doc.isObject()) {
+        return {};
+    }
+    const auto room = doc.object().value("room").toObject();
+    return room.value("active_battle_id").toString();
+}
+
+bool MainWindow::restoreBattleSnapshot() {
+    auto battleId = session_.battleId;
+    if (battleId.isEmpty()) {
+        battleId = activeBattleIdFromRoomDetail(session_.roomId);
+        if (!battleId.isEmpty()) {
+            session_.battleId = battleId;
+        }
+    }
+    if (battleId.isEmpty()) {
+        return false;
+    }
+
+    QString error;
+    const auto body = gateway_.queryBattleState(battleId, &error);
+    if (!error.isEmpty() || body.isEmpty()) {
+        return false;
+    }
+    auto snapshot = decodeTankSnapshot(body.toStdString());
+    if (!snapshot.has_value()) {
+        return false;
+    }
+    battle_->applySnapshot(*snapshot);
+    handleTankSnapshot(*snapshot);
+    return true;
 }
 
 }  // namespace bgtc

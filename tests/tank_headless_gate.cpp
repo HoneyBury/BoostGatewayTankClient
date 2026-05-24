@@ -136,6 +136,14 @@ int main(int argc, char* argv[]) {
     const auto join = bob.join_room(room_id, timeout);
     state.add_step("join_room", join.ok, join.error_message);
 
+    const auto room_list = alice.room_list(1, 20, "", timeout);
+    state.add_step("room_list", room_list.ok && room_list.response_body.find(room_id) != std::string::npos,
+                   room_list.response_body.empty() ? room_list.error_message : room_list.response_body);
+
+    const auto room_detail = alice.room_detail(room_id, timeout);
+    state.add_step("room_detail", room_detail.ok && room_detail.response_body.find(room_id) != std::string::npos,
+                   room_detail.response_body.empty() ? room_detail.error_message : room_detail.response_body);
+
     const auto ready_a = alice.set_ready(true, timeout);
     const auto ready_b = bob.set_ready(true, timeout);
     state.add_step("ready_two_users", ready_a.ok && ready_b.ok,
@@ -150,6 +158,16 @@ int main(int argc, char* argv[]) {
     state.add_step("send_battle_inputs", move_a.ok && move_b.ok,
                    move_a.error_message + " | " + move_b.error_message);
     std::this_thread::sleep_for(250ms);
+
+    const auto battle_state = alice.battle_state(start.battle_id, timeout);
+    const auto restored_snapshot = bgtc::decodeTankSnapshot(battle_state.response_body);
+    state.add_step("battle_state_query",
+                   battle_state.ok && restored_snapshot.has_value() &&
+                       restored_snapshot->frame >= 1 &&
+                       restored_snapshot->tanks.size() >= 2,
+                   battle_state.response_body.empty()
+                       ? battle_state.error_message
+                       : battle_state.response_body);
 
     const auto finish = alice.send_battle_input(bgtc::encodeLegacyFinishInput("surrender"), timeout);
     state.add_step("finish_battle", finish.ok, finish.error_message);

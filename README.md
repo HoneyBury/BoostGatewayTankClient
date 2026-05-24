@@ -84,7 +84,7 @@ BGTC_GATEWAY_PORT=9201 \
 
 - 登录窗口：支持 host、port、user id、token 输入。
 - 大厅窗口：支持创建房间、加入房间、准备、开始战斗、离开房间、查询排行榜；
-  对房间列表/详情/房主管理等未暴露 SDK 能力有明确提示。
+  房间列表和房间详情已通过 SDK 访问真实 gateway/backend，房主管理仍保留能力提示。
 - 战斗窗口：支持网格渲染、服务端 snapshot 渲染、玩家 HP/Score/Pos HUD、
   结算卡片，WASD/方向键发送真实 `move:x,y`，空格发送 `attack:user_id`，
   F 发送 `finish:reason`。
@@ -132,6 +132,7 @@ gateway 协议不一致。
 
 ## 下一步
 
-整体路线以“真实多人同屏可玩”为主线，下一步优先补齐房间列表/详情 SDK、
-主动恢复 battle snapshot、完整 UI 自动化联调和回放。详细规划见
+整体路线以“真实多人同屏可玩”为主线。当前已接入 battle state 查询并可在重连后
+主动恢复最新 snapshot；下一步优先推进完整 UI 自动化联调、真断线恢复场景、回放
+和道具协议。详细规划见
 [docs/production-roadmap.md](docs/production-roadmap.md)。

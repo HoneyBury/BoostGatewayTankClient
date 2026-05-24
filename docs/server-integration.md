@@ -138,22 +138,24 @@ runtime/validation/tank-client-headless-summary.json
 - finish / settlement 能写入排行榜。
 - 回放可查询并能被客户端渲染。
 
-当前第一版自动化已经包含 headless bot 和 Qt offscreen UI smoke。后续完整 UI
-自动化应在服务端 room detail / battle state 查询 API 稳定后，再覆盖真实登录、
-建房、加入、ready、start 和恢复状态断言。
+当前自动化已经包含 headless bot、Qt offscreen UI smoke 和真实 live gate。
+live gate 会自动启动服务端栈，并覆盖双客户端登录、建房、加入、ready、start、
+房间列表、房间详情、战斗输入、battle state 查询恢复、finish 与 leaderboard。
+后续完整 UI 自动化应继续覆盖真实登录、建房、加入、ready、start 和真断线恢复
+状态断言。
 
 ## 联调风险
 
-- 当前客户端已能消费 SDK 和真实 battle push；主动恢复 snapshot、room detail、
-  room list、battle state 查询还需要服务端/SDK 暴露通用 API。
-- 房间列表、房间详情、踢人、转让房主等能力需要确认 SDK 是否已有公开 API；
-  如果 SDK 没有，需要服务端先补通用 API，而不是客户端绕过 SDK 直连后端。
+- 当前客户端已能消费 SDK 和真实 battle push；房间列表、房间详情、battle state
+  查询恢复已通过 SDK 和 live gate 验证。
+- 踢人、转让房主等房主管理能力仍需要服务端先补通用 API，而不是客户端绕过
+  SDK 直连后端。
 - 回放和道具需要服务端协议先固定版本，否则客户端只能做预留 UI。
 
 ## 下一轮跨仓联调建议
 
-1. 服务端先提供一个固定端口或动态端口 summary，包含 gateway host/port。
-2. 客户端读取该 summary 自动填充连接配置。
-3. 服务端确保 battle snapshot push body 与 `docs/protocol.md` 兼容。
-4. 客户端增加 headless bot，完成双人登录、房间、ready、battle、输入、snapshot 校验。
-5. 两仓共同产出 `runtime/validation/tank-client-integration-summary.json`。
+1. 客户端增加真实 UI 自动化 gate，覆盖登录、大厅、房间详情、战斗输入和恢复状态断言。
+2. live gate 增加真断线场景：断开、重连、通过 room detail 找回 active battle、
+   再调用 battle state 查询恢复 snapshot。
+3. 服务端继续确保 battle snapshot push body 与 `docs/protocol.md` 兼容。
+4. 两仓共同产出 `runtime/validation/tank-client-integration-summary.json`。
