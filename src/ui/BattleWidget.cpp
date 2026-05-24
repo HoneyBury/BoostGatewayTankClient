@@ -2,6 +2,7 @@
 
 #include "tank/TankProtocol.h"
 
+#include <QFont>
 #include <QKeyEvent>
 #include <QPainter>
 #include <algorithm>
@@ -12,13 +13,15 @@ namespace {
 constexpr int kCell = 32;
 constexpr int kMapWidth = 20;
 constexpr int kMapHeight = 15;
+constexpr int kMapMargin = 18;
+constexpr int kPanelWidth = 280;
 
 }  // namespace
 
 BattleWidget::BattleWidget(ClientSession& session, GatewayClient& gateway, QWidget* parent)
     : QWidget(parent), session_(session), gateway_(gateway) {
     setFocusPolicy(Qt::StrongFocus);
-    setMinimumSize(kMapWidth * kCell + 260, kMapHeight * kCell + 40);
+    setMinimumSize(kMapWidth * kCell + kPanelWidth + kMapMargin * 3, kMapHeight * kCell + kMapMargin * 2);
 }
 
 void BattleWidget::applySnapshot(TankSnapshot snapshot) {
@@ -28,38 +31,57 @@ void BattleWidget::applySnapshot(TankSnapshot snapshot) {
 
 void BattleWidget::paintEvent(QPaintEvent*) {
     QPainter painter(this);
-    painter.fillRect(rect(), QColor("#17212b"));
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.fillRect(rect(), QColor("#0f1720"));
 
-    painter.setPen(QColor("#34495e"));
+    const QRect mapRect(kMapMargin, kMapMargin, kMapWidth * kCell, kMapHeight * kCell);
+    painter.setPen(QColor("#26384a"));
+    painter.setBrush(QColor("#13202b"));
+    painter.drawRoundedRect(mapRect.adjusted(-1, -1, 1, 1), 14, 14);
+
+    painter.setPen(QColor("#203243"));
     for (int x = 0; x <= kMapWidth; ++x) {
-        painter.drawLine(x * kCell, 0, x * kCell, kMapHeight * kCell);
+        painter.drawLine(mapRect.left() + x * kCell, mapRect.top(), mapRect.left() + x * kCell, mapRect.bottom());
     }
     for (int y = 0; y <= kMapHeight; ++y) {
-        painter.drawLine(0, y * kCell, kMapWidth * kCell, y * kCell);
+        painter.drawLine(mapRect.left(), mapRect.top() + y * kCell, mapRect.right(), mapRect.top() + y * kCell);
     }
 
     for (const auto& bullet : snapshot_.bullets) {
         painter.setBrush(QColor("#ffd166"));
         painter.setPen(Qt::NoPen);
-        painter.drawEllipse(bullet.x * kCell + 10, bullet.y * kCell + 10, 12, 12);
+        painter.drawEllipse(mapRect.left() + bullet.x * kCell + 10, mapRect.top() + bullet.y * kCell + 10, 12, 12);
     }
 
     for (const auto& item : snapshot_.items) {
-        painter.setBrush(QColor("#8ecae6"));
-        painter.setPen(QColor("#023047"));
-        painter.drawRect(item.x * kCell + 7, item.y * kCell + 7, kCell - 14, kCell - 14);
-        painter.drawText(item.x * kCell + 8,
-                         item.y * kCell + 22,
+        painter.setBrush(QColor("#5cc8ff"));
+        painter.setPen(QColor("#bdefff"));
+        painter.drawRoundedRect(mapRect.left() + item.x * kCell + 7,
+                                mapRect.top() + item.y * kCell + 7,
+                                kCell - 14,
+                                kCell - 14,
+                                5,
+                                5);
+        painter.setPen(QColor("#062338"));
+        painter.drawText(mapRect.left() + item.x * kCell + 8,
+                         mapRect.top() + item.y * kCell + 22,
                          QString::fromStdString(item.type.substr(0, 2)));
     }
 
     for (const auto& tank : snapshot_.tanks) {
         const auto screen = tankToScreen(tank);
-        painter.setBrush(tank.userId == session_.userId.toStdString() ? QColor("#06d6a0") : QColor("#ef476f"));
+        const bool isLocal = tank.userId == session_.userId.toStdString();
+        painter.setBrush(isLocal ? QColor("#26d9a1") : QColor("#ff5c7a"));
+        painter.setPen(QPen(isLocal ? QColor("#b8ffe9") : QColor("#ffd2dc"), 2));
+        painter.drawRoundedRect(mapRect.left() + screen.x() + 4,
+                                mapRect.top() + screen.y() + 4,
+                                kCell - 8,
+                                kCell - 8,
+                                6,
+                                6);
         painter.setPen(QColor("#ffffff"));
-        painter.drawRoundedRect(screen.x() + 4, screen.y() + 4, kCell - 8, kCell - 8, 4, 4);
-        painter.drawText(screen.x() + 4,
-                         screen.y() + 18,
+        painter.drawText(mapRect.left() + screen.x() + 7,
+                         mapRect.top() + screen.y() + 20,
                          QString::fromStdString(tank.userId.substr(0, 2)));
     }
 
@@ -147,45 +169,112 @@ void BattleWidget::sendFire(int direction) {
 }
 
 void BattleWidget::drawPanel(QPainter& painter) {
-    const int panelX = kMapWidth * kCell + 24;
-    painter.setPen(QColor("#f8f9fa"));
-    painter.drawText(panelX, 30, "Battle: " + session_.battleId);
-    painter.drawText(panelX, 55, QString("Frame: %1").arg(snapshot_.frame));
-    painter.drawText(panelX, 80, snapshot_.finished ? "已结束" : "运行中");
-    painter.drawText(panelX, 105, QString("Tanks: %1").arg(snapshot_.tanks.size()));
-    painter.drawText(panelX, 130, QString("Bullets: %1").arg(snapshot_.bullets.size()));
-    painter.drawText(panelX, 155, QString("Items: %1").arg(snapshot_.items.size()));
+    const QRect panel(kMapMargin * 2 + kMapWidth * kCell, kMapMargin, kPanelWidth, kMapHeight * kCell);
+    painter.setPen(QColor("#26384a"));
+    painter.setBrush(QColor("#111c28"));
+    painter.drawRoundedRect(panel, 16, 16);
+
+    const int panelX = panel.left() + 20;
+    int y = panel.top() + 34;
+    QFont titleFont = painter.font();
+    titleFont.setPointSize(titleFont.pointSize() + 3);
+    titleFont.setBold(true);
+    painter.setFont(titleFont);
+    painter.setPen(QColor("#f7fbff"));
+    painter.drawText(panelX, y, "战斗面板");
+
+    QFont bodyFont = painter.font();
+    bodyFont.setPointSize(bodyFont.pointSize() - 3);
+    bodyFont.setBold(false);
+    painter.setFont(bodyFont);
+
+    y += 34;
+    painter.setPen(QColor("#9fb0c2"));
+    painter.drawText(panelX, y, "Battle ID");
+    y += 22;
+    painter.setPen(QColor("#e8f1f8"));
+    painter.drawText(panelX, y, session_.battleId.isEmpty() ? "等待开始" : session_.battleId.left(24));
+
+    y += 36;
+    painter.setPen(QColor("#9fb0c2"));
+    painter.drawText(panelX, y, "实时状态");
+    y += 24;
+    painter.setPen(snapshot_.finished ? QColor("#ffd166") : QColor("#26d9a1"));
+    painter.drawText(panelX, y, snapshot_.finished ? "已结束" : "运行中");
+
+    y += 28;
+    painter.setPen(QColor("#e8f1f8"));
+    painter.drawText(panelX, y, QString("Frame  %1").arg(snapshot_.frame));
+    y += 24;
+    painter.drawText(panelX, y, QString("Tanks  %1    Bullets  %2").arg(snapshot_.tanks.size()).arg(snapshot_.bullets.size()));
+    y += 24;
+    painter.drawText(panelX, y, QString("Items  %1").arg(snapshot_.items.size()));
+
     if (const auto* localTank = findLocalTank()) {
-        painter.drawText(panelX, 180, QString("HP: %1  Score: %2").arg(localTank->hp).arg(localTank->score));
-        painter.drawText(panelX, 205, QString("Pos: %1,%2").arg(localTank->x).arg(localTank->y));
+        y += 34;
+        painter.setPen(QColor("#9fb0c2"));
+        painter.drawText(panelX, y, "我的坦克");
+        y += 24;
+        painter.setPen(QColor("#e8f1f8"));
+        painter.drawText(panelX, y, QString("HP %1    Score %2").arg(localTank->hp).arg(localTank->score));
+        y += 24;
+        painter.drawText(panelX, y, QString("Position %1, %2").arg(localTank->x).arg(localTank->y));
     }
     if (snapshot_.battleState.has_value()) {
-        painter.drawText(panelX, 230, "State: " + QString::fromStdString(snapshot_.battleState->kind));
+        y += 30;
+        painter.setPen(QColor("#9fb0c2"));
+        painter.drawText(panelX, y, "服务端阶段");
+        y += 24;
+        painter.setPen(QColor("#e8f1f8"));
+        painter.drawText(panelX, y, QString::fromStdString(snapshot_.battleState->kind).left(24));
     }
-    painter.drawText(panelX, 265, "操作:");
-    painter.drawText(panelX, 290, "WASD / 方向键：移动");
-    painter.drawText(panelX, 315, "空格：攻击最近目标");
-    painter.drawText(panelX, 340, "F：结束战斗");
-    painter.drawText(panelX, 375, "规则：以服务端 snapshot 为准");
+
+    y += 36;
+    painter.setPen(QColor("#9fb0c2"));
+    painter.drawText(panelX, y, "操作");
+    y += 24;
+    painter.setPen(QColor("#e8f1f8"));
+    painter.drawText(panelX, y, "WASD / 方向键：移动");
+    y += 24;
+    painter.drawText(panelX, y, "空格：攻击最近目标");
+    y += 24;
+    painter.drawText(panelX, y, "F：结束战斗");
+    y += 30;
+    painter.setPen(QColor("#9fb0c2"));
+    painter.drawText(panelX, y, "规则：以服务端 snapshot 为准");
+
     if (!lastInput_.isEmpty()) {
-        painter.drawText(panelX, 400, "最近输入: " + lastInput_.left(24));
+        y += 30;
+        painter.setPen(QColor("#26d9a1"));
+        painter.drawText(panelX, y, "最近输入：" + lastInput_.left(24));
     }
     if (!lastInputError_.isEmpty()) {
         painter.setPen(QColor("#ffb703"));
-        painter.drawText(panelX, 435, "最近输入错误:");
-        painter.drawText(panelX, 460, lastInputError_.left(28));
+        y += 30;
+        painter.drawText(panelX, y, "最近输入错误：");
+        y += 24;
+        painter.drawText(panelX, y, lastInputError_.left(30));
     }
 }
 
 void BattleWidget::drawSettlement(QPainter& painter) {
-    const QRect card(72, 70, kMapWidth * kCell - 144, 250);
+    const QRect card(kMapMargin + 72, kMapMargin + 54, kMapWidth * kCell - 144, 270);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QColor("#f8f9fa"));
-    painter.setBrush(QColor(20, 28, 38, 235));
-    painter.drawRoundedRect(card, 14, 14);
+    painter.setPen(QColor("#35536d"));
+    painter.setBrush(QColor(17, 28, 40, 242));
+    painter.drawRoundedRect(card, 18, 18);
 
+    QFont titleFont = painter.font();
+    titleFont.setPointSize(titleFont.pointSize() + 5);
+    titleFont.setBold(true);
+    painter.setFont(titleFont);
     painter.setPen(QColor("#ffd166"));
     painter.drawText(card.adjusted(24, 28, -24, -24), "战斗结算");
+    QFont bodyFont = painter.font();
+    bodyFont.setPointSize(bodyFont.pointSize() - 5);
+    bodyFont.setBold(false);
+    painter.setFont(bodyFont);
+
     painter.setPen(QColor("#f8f9fa"));
     painter.drawText(card.left() + 24,
                      card.top() + 72,

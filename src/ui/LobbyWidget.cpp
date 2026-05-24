@@ -1,5 +1,6 @@
 #include "ui/LobbyWidget.h"
 
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -13,18 +14,36 @@ namespace bgtc {
 LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient& gateway, QWidget* parent)
     : QWidget(parent), config_(std::move(config)), session_(session), gateway_(gateway) {
     auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(4, 4, 4, 4);
+    layout->setSpacing(14);
+
+    auto* title = new QLabel("房间大厅", this);
+    title->setObjectName("PageTitle");
+    layout->addWidget(title);
+
+    auto* hint = new QLabel("输入房间 ID 后创建或加入房间；准备后由房主开始战斗。", this);
+    hint->setObjectName("PageHint");
+    hint->setWordWrap(true);
+    layout->addWidget(hint);
+
     roomState_ = new QLabel("大厅：尚未进入房间", this);
+    roomState_->setObjectName("StatePill");
     layout->addWidget(roomState_);
+
     capabilityState_ = new QLabel(
-        "当前 SDK：create/join/leave/ready/start 可用；list/detail/admin/register 等待服务端 API。",
+        "当前可用：创建、加入、离开、准备、开始战斗。房间列表/详情/房主管理仍等待服务端 SDK API。",
         this);
+    capabilityState_->setObjectName("PageHint");
     capabilityState_->setWordWrap(true);
     layout->addWidget(capabilityState_);
 
     roomEdit_ = new QLineEdit(config_.defaultRoom, this);
+    roomEdit_->setPlaceholderText("room_id，例如 default-room");
     layout->addWidget(roomEdit_);
 
-    auto* row = new QHBoxLayout();
+    auto* row = new QGridLayout();
+    row->setHorizontalSpacing(10);
+    row->setVerticalSpacing(10);
     auto* listButton = new QPushButton("刷新房间列表", this);
     auto* createButton = new QPushButton("创建房间", this);
     auto* joinButton = new QPushButton("加入房间", this);
@@ -34,24 +53,27 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     auto* leaveButton = new QPushButton("离开房间", this);
     auto* adminButton = new QPushButton("房主管理", this);
     auto* leaderboardButton = new QPushButton("排行榜", this);
-    row->addWidget(listButton);
-    row->addWidget(createButton);
-    row->addWidget(joinButton);
-    row->addWidget(readyButton);
-    row->addWidget(unreadyButton);
-    row->addWidget(startButton);
-    row->addWidget(leaveButton);
-    row->addWidget(adminButton);
-    row->addWidget(leaderboardButton);
+
+    row->addWidget(createButton, 0, 0);
+    row->addWidget(joinButton, 0, 1);
+    row->addWidget(readyButton, 0, 2);
+    row->addWidget(startButton, 0, 3);
+    row->addWidget(unreadyButton, 1, 0);
+    row->addWidget(leaveButton, 1, 1);
+    row->addWidget(listButton, 1, 2);
+    row->addWidget(adminButton, 1, 3);
+    row->addWidget(leaderboardButton, 1, 4);
+    row->setColumnStretch(4, 1);
     layout->addLayout(row);
 
     roomList_ = new QListWidget(this);
-    roomList_->addItem("可用：手动输入 room_id 创建/加入房间。");
-    roomList_->addItem("待服务端 SDK：房间列表、房间详情、房主操作、邀请/踢人。");
+    roomList_->addItem("操作提示：手动输入 room_id 后可以创建或加入房间。");
+    roomList_->addItem("能力提示：房间列表、房间详情、邀请/踢人将在服务端 API 可用后接入。");
     layout->addWidget(roomList_);
 
     log_ = new QTextEdit(this);
     log_->setReadOnly(true);
+    log_->setPlaceholderText("房间事件、推送消息和错误提示会显示在这里。");
     layout->addWidget(log_);
 
     connect(listButton, &QPushButton::clicked, this, &LobbyWidget::showUnsupportedRoomList);
@@ -73,7 +95,7 @@ void LobbyWidget::createRoom() {
         session_.roomId = roomId;
         session_.state = ConnectionState::InRoom;
         refreshRoomSummary();
-        appendLog("创建房间成功：" + roomId);
+        appendLog("创建房间成功：" + roomId + "，请点击“准备”。");
     } else {
         appendLog("创建房间失败：" + error);
     }
@@ -86,7 +108,7 @@ void LobbyWidget::joinRoom() {
         session_.roomId = roomId;
         session_.state = ConnectionState::InRoom;
         refreshRoomSummary();
-        appendLog("加入房间成功：" + roomId);
+        appendLog("加入房间成功：" + roomId + "，请确认准备状态。");
     } else {
         appendLog("加入房间失败：" + error);
     }
@@ -116,7 +138,7 @@ void LobbyWidget::setReady() {
     if (gateway_.setReady(true, &error)) {
         session_.ready = true;
         refreshRoomSummary();
-        appendLog("已准备。");
+        appendLog("已准备，等待房主开始战斗。");
     } else {
         appendLog("准备失败：" + error);
     }
@@ -130,7 +152,7 @@ void LobbyWidget::unsetReady() {
     if (gateway_.setReady(false, &error)) {
         session_.ready = false;
         refreshRoomSummary();
-        appendLog("已取消准备。");
+        appendLog("已取消准备，可以调整后再次准备。");
     } else {
         appendLog("取消准备失败：" + error);
     }
@@ -159,8 +181,8 @@ void LobbyWidget::refreshLeaderboard() {
 
 void LobbyWidget::showUnsupportedRoomList() {
     roomList_->clear();
-    roomList_->addItem("房间列表：等待服务端 SDK 暴露 list_rooms/page/filter API。");
-    roomList_->addItem("当前可验证路径：复制/输入 room_id 后 create 或 join。");
+    roomList_->addItem("房间列表暂不可用：等待服务端 SDK 暴露 list_rooms/page/filter API。");
+    roomList_->addItem("当前可用路径：复制或输入 room_id 后创建/加入房间。");
     appendLog(gateway_.unsupportedFeatureMessage("房间列表/分页/过滤"));
 }
 
@@ -179,7 +201,7 @@ void LobbyWidget::refreshRoomSummary() {
     }
     const auto readyText = session_.ready ? "已准备" : "未准备";
     const auto battleText = session_.battleId.isEmpty() ? "未开始战斗" : "战斗：" + session_.battleId;
-    roomState_->setText(QString("当前房间：%1 | %2 | %3")
+    roomState_->setText(QString("当前房间：%1    状态：%2    %3")
                             .arg(session_.roomId, readyText, battleText));
 }
 

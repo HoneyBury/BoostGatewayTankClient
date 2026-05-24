@@ -137,15 +137,17 @@
   已兼容当前服务端 `battle_state:kind=...`、`frame_advanced` 和
   `battle_finished` push。Qt UI 的 WASD/方向键已切到真实服务端 `move:x,y`
   输入，空格使用 `attack:user_id`，F 使用 `finish:reason`。
-- P3 已有 heartbeat 启动、disconnect callback、菜单重连入口和重连次数诊断；
-  resume snapshot 的完整业务恢复还需要服务端/SDK API 明确。
+- P3 已有 heartbeat 启动、disconnect callback、菜单重连入口、重连次数诊断、
+  `SessionResumedPush` / `SessionKickedPush` 处理和本地 room/battle 上下文弱恢复；
+  主动查询 resume snapshot、room detail、battle state 仍需要服务端/SDK API 明确。
 - P4 已有排行榜页、结算摘要和回放页占位；排行榜 top/rank 走 SDK，战斗结束后
   会自动刷新最近一局结算和排行榜。回放查询等待 SDK API。
 - P5 已有道具 snapshot 模型和渲染占位，具体道具协议等待服务端协议稳定。
 - P6 已有构建脚本和 SDK 导入策略，尚未做平台打包。
 - P7 已有诊断页、SDK version、push/snapshot/input/reconnect 计数；已新增
-  `tank_headless_gate` 和 `scripts/run-headless-gate.sh`，可对正在运行的 gateway
-  执行双客户端 login/room/ready/battle/input/finish/leaderboard 验证。
+  `tank_headless_gate`、`tank_ui_smoke_test`、`scripts/run-headless-gate.sh` 和
+  `scripts/run-live-gate.sh`，可覆盖离线 Qt UI smoke 与真实 gateway 双客户端
+  login/room/ready/battle/input/finish/leaderboard 验证。
 
 ## P1/P2/P7 当前收束结论
 
@@ -161,5 +163,7 @@
   客户端仍保留 `tank.input` JSON 和 `tank.snapshot` JSON 模型，便于后续协议升级。
 - 结算排行榜：客户端可解析 `battle_finished` 的 winner、reason、total_frames 和
   scores，战斗结束后自动切到排行榜页并刷新展示。
-- 自动化：`tank_protocol_smoke_test` 覆盖协议解析，`tank_headless_gate` 覆盖真实
-  gateway 业务闭环。
+- P3 弱恢复：客户端可识别服务端 resumed/kicked push，重连后恢复本地 room/battle
+  导航上下文；完整恢复还需要服务端 SDK 暴露 room detail / battle state 查询。
+- 自动化：`tank_protocol_smoke_test` 覆盖协议解析，`tank_ui_smoke_test` 覆盖离线
+  Qt Widgets 构造和战斗快照渲染，`tank_headless_gate` 覆盖真实 gateway 业务闭环。

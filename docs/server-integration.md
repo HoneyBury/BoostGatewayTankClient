@@ -115,6 +115,16 @@ runtime/validation/tank-client-live-gate-summary.json
 runtime/validation/tank-client-headless-summary.json
 ```
 
+客户端本地验证还包含离线 Qt UI smoke gate：
+
+```bash
+./scripts/verify-client-local.sh
+```
+
+该脚本会构建并运行 `tank_protocol_smoke_test` 和 `tank_ui_smoke_test`。UI gate 使用
+`QT_QPA_PLATFORM=offscreen`，只验证核心 widgets 构造、战斗 snapshot/settlement
+渲染路径和基础页面稳定性，不触发真实 gateway 网络请求。
+
 长期联调门禁还应该继续扩展：
 
 - 启动本地服务端栈。
@@ -128,13 +138,14 @@ runtime/validation/tank-client-headless-summary.json
 - finish / settlement 能写入排行榜。
 - 回放可查询并能被客户端渲染。
 
-第一版自动化可以先用 headless bot 或 Qt 非 UI 测试完成，不必一开始就做完整
-UI 自动化。
+当前第一版自动化已经包含 headless bot 和 Qt offscreen UI smoke。后续完整 UI
+自动化应在服务端 room detail / battle state 查询 API 稳定后，再覆盖真实登录、
+建房、加入、ready、start 和恢复状态断言。
 
 ## 联调风险
 
-- 当前客户端已能消费 SDK，但真实 snapshot push 还需要服务端 demo/gateway 路径
-  明确落到客户端可接收的 push body。
+- 当前客户端已能消费 SDK 和真实 battle push；主动恢复 snapshot、room detail、
+  room list、battle state 查询还需要服务端/SDK 暴露通用 API。
 - 房间列表、房间详情、踢人、转让房主等能力需要确认 SDK 是否已有公开 API；
   如果 SDK 没有，需要服务端先补通用 API，而不是客户端绕过 SDK 直连后端。
 - 回放和道具需要服务端协议先固定版本，否则客户端只能做预留 UI。

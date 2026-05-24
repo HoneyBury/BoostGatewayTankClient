@@ -1,6 +1,7 @@
 #include "sdk/GatewayClient.h"
 
 #include <boost_gateway/sdk/version.h>
+#include <boost_gateway/sdk/protocol/message.h>
 
 #include <QMetaObject>
 
@@ -13,6 +14,29 @@ constexpr auto kDefaultTimeout = std::chrono::seconds(5);
 
 std::string toStdString(const QString& value) {
     return value.toUtf8().toStdString();
+}
+
+struct ResumeBody {
+    QString roomId;
+    bool inBattle = false;
+};
+
+ResumeBody parseResumeBody(const QString& body) {
+    if (!body.startsWith("session_resumed:")) {
+        return ResumeBody{body, false};
+    }
+
+    const auto parts = body.split(':');
+    ResumeBody parsed;
+    if (parts.size() >= 2) {
+        parsed.roomId = parts.at(1);
+    }
+    for (const auto& part : parts) {
+        if (part == "battle=1" || part == "battle=true") {
+            parsed.inBattle = true;
+        }
+    }
+    return parsed;
 }
 
 }  // namespace
@@ -263,9 +287,18 @@ void GatewayClient::installCallbacks() {
     diagnostics_.sdkVersion = sdkVersion();
     client_->on_push([this](const boost_gateway::sdk::PushMessage& message) {
         const auto body = QString::fromStdString(message.body);
-        QMetaObject::invokeMethod(this, [this, body]() {
+        const auto messageId = message.message_id;
+        QMetaObject::invokeMethod(this, [this, body, messageId]() {
             ++diagnostics_.pushesReceived;
             emit pushReceived(body);
+            if (messageId == boost_gateway::sdk::protocol::kSessionResumedPush) {
+                const auto resumed = parseResumeBody(body);
+                recordEvent("session resumed: " + resumed.roomId);
+                emit sessionResumed(resumed.roomId, resumed.inBattle);
+            } else if (messageId == boost_gateway::sdk::protocol::kSessionKickedPush) {
+                recordError("session kicked: " + body);
+                emit sessionKicked(body);
+            }
             if (auto snapshot = decodeTankSnapshot(body.toStdString())) {
                 ++diagnostics_.snapshotsReceived;
                 diagnostics_.latestFrame = snapshot->frame;

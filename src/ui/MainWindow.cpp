@@ -24,11 +24,96 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
     session_.displayName = session_.userId;
 
     setWindowTitle("BoostGateway Tank Client");
+    resize(1180, 760);
+    setStyleSheet(R"(
+        QMainWindow {
+            background: #0f1720;
+        }
+        QWidget {
+            color: #dfe7ef;
+            font-size: 14px;
+        }
+        QListWidget#MainNavigation {
+            background: #111c28;
+            border: 1px solid #243447;
+            border-radius: 16px;
+            padding: 10px;
+            outline: 0;
+        }
+        QListWidget#MainNavigation::item {
+            border-radius: 10px;
+            margin: 3px 0;
+            padding: 12px 14px;
+        }
+        QListWidget#MainNavigation::item:selected {
+            background: #1f8a70;
+            color: #ffffff;
+        }
+        QListWidget#MainNavigation::item:hover:!selected {
+            background: #1a2a3a;
+        }
+        QLabel#PageTitle {
+            color: #f7fbff;
+            font-size: 22px;
+            font-weight: 700;
+        }
+        QLabel#PageHint {
+            color: #9fb0c2;
+            line-height: 1.4;
+        }
+        QLabel#StatePill {
+            background: #132436;
+            border: 1px solid #2c4359;
+            border-radius: 12px;
+            color: #cfe8ff;
+            padding: 10px 12px;
+        }
+        QLineEdit, QTextEdit, QListWidget {
+            background: #101a25;
+            border: 1px solid #26384a;
+            border-radius: 12px;
+            color: #e8f1f8;
+            selection-background-color: #1f8a70;
+        }
+        QLineEdit {
+            padding: 10px 12px;
+        }
+        QTextEdit {
+            padding: 10px;
+        }
+        QPushButton {
+            background: #1c2f42;
+            border: 1px solid #34506a;
+            border-radius: 11px;
+            color: #edf6ff;
+            padding: 9px 14px;
+        }
+        QPushButton:hover {
+            background: #25415a;
+            border-color: #4d718f;
+        }
+        QPushButton:pressed {
+            background: #183047;
+        }
+        QStatusBar {
+            background: #0b1118;
+            color: #aebdca;
+        }
+        QMenuBar {
+            background: #0f1720;
+            color: #dfe7ef;
+        }
+    )");
+
     auto* shell = new QWidget(this);
     auto* shellLayout = new QHBoxLayout(shell);
+    shellLayout->setContentsMargins(18, 18, 18, 14);
+    shellLayout->setSpacing(18);
     navigation_ = new QListWidget(shell);
-    navigation_->addItems({"房间大厅", "战斗", "排行榜", "回放", "诊断", "设置"});
-    navigation_->setFixedWidth(150);
+    navigation_->setObjectName("MainNavigation");
+    navigation_->addItems({"大厅 Lobby", "战斗 Battle", "排行榜", "回放", "诊断", "设置"});
+    navigation_->setFixedWidth(172);
+    navigation_->setSpacing(2);
 
     stack_ = new QStackedWidget(shell);
     lobby_ = new LobbyWidget(config_, session_, gateway_, this);
@@ -51,6 +136,7 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
     navigation_->setCurrentRow(0);
 
     statusLabel_ = new QLabel(this);
+    statusLabel_->setObjectName("PageHint");
     statusBar()->addPermanentWidget(statusLabel_);
     auto* reconnectAction = menuBar()->addAction("重连");
     connect(reconnectAction, &QAction::triggered, this, &MainWindow::reconnect);
@@ -60,13 +146,32 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
         session_.battleId = battleId;
         session_.state = ConnectionState::InBattle;
         navigation_->setCurrentRow(1);
-        setStatus("Battle started: " + battleId);
+        setStatus("战斗已开始：" + battleId);
     });
     connect(&gateway_, &GatewayClient::tankSnapshotReceived, battle_, &BattleWidget::applySnapshot);
     connect(&gateway_, &GatewayClient::tankSnapshotReceived, this, &MainWindow::handleTankSnapshot);
+    connect(&gateway_, &GatewayClient::sessionResumed, this, [this](const QString& roomId, bool inBattle) {
+        if (!roomId.isEmpty()) {
+            session_.roomId = roomId;
+        }
+        session_.state = inBattle ? ConnectionState::InBattle : ConnectionState::InRoom;
+        if (inBattle) {
+            navigation_->setCurrentRow(1);
+        } else {
+            navigation_->setCurrentRow(0);
+        }
+        setStatus(QString("服务端恢复会话：room=%1，battle=%2")
+                      .arg(session_.roomId.isEmpty() ? "未知" : session_.roomId)
+                      .arg(inBattle ? "是" : "否"));
+    });
+    connect(&gateway_, &GatewayClient::sessionKicked, this, [this](const QString& reason) {
+        session_.state = ConnectionState::Disconnected;
+        QMessageBox::warning(this, "会话被替换", "当前账号在其他连接登录或会话被服务端替换：\n" + reason);
+        setStatus("会话被替换，请重新登录或重连。");
+    });
     connect(&gateway_, &GatewayClient::disconnected, this, [this]() {
         session_.state = ConnectionState::Disconnected;
-        setStatus("Disconnected from gateway.");
+        setStatus("已断开与网关的连接。");
     });
 
     connectAndLogin(token_);
@@ -75,36 +180,36 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
 void MainWindow::connectAndLogin(const QString& token) {
     QString error;
     session_.state = ConnectionState::Connecting;
-    setStatus("Connecting...");
+    setStatus("正在连接网关...");
     if (!gateway_.connectToGateway(config_, &error)) {
         QMessageBox::critical(this, "Connect Failed", error);
-        setStatus("Connect failed.");
+        setStatus("连接失败，请检查服务端地址或网络。");
         return;
     }
 
     session_.state = ConnectionState::Connected;
-    setStatus("Logging in...");
+    setStatus("连接成功，正在登录...");
     if (!gateway_.login(session_.userId, token, &error)) {
         QMessageBox::critical(this, "Login Failed", error);
-        setStatus("Login failed.");
+        setStatus("登录失败，请检查账号或 token。");
         return;
     }
 
     session_.state = ConnectionState::InLobby;
-    setStatus("Logged in as " + session_.userId);
+    setStatus("已登录：" + session_.userId + "，可以创建或加入房间。");
 }
 
 void MainWindow::reconnect() {
     QString error;
     session_.state = ConnectionState::Reconnecting;
-    setStatus("Reconnecting...");
+    setStatus("正在重连...");
     if (!gateway_.reconnectToGateway(config_, session_.userId, token_, &error)) {
         QMessageBox::warning(this, "重连失败", error);
-        setStatus("Reconnect failed.");
+        setStatus("重连失败，请稍后再试。");
         return;
     }
     session_.state = session_.battleId.isEmpty() ? ConnectionState::InLobby : ConnectionState::InBattle;
-    setStatus("Reconnected.");
+    setStatus("重连成功，已恢复本地上下文；完整 room/battle snapshot 恢复等待服务端 SDK API。");
 }
 
 void MainWindow::setStatus(const QString& text) {
@@ -136,7 +241,7 @@ void MainWindow::handleTankSnapshot(const TankSnapshot& snapshot) {
     }
 
     const auto winner = session_.lastWinnerUserId.isEmpty() ? "未知" : session_.lastWinnerUserId;
-    setStatus(QString("Battle finished. winner=%1 frames=%2")
+    setStatus(QString("战斗结束：胜者 %1，总帧数 %2")
                   .arg(winner)
                   .arg(session_.lastBattleFrames));
     if (leaderboard_ != nullptr) {

@@ -53,6 +53,8 @@ public:
 signals:
     void pushReceived(QString body);
     void tankSnapshotReceived(bgtc::TankSnapshot snapshot);
+    void sessionResumed(QString roomId, bool inBattle);
+    void sessionKicked(QString reason);
     void disconnected();
     void diagnosticsChanged(bgtc::ClientDiagnostics diagnostics);
 

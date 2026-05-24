@@ -61,6 +61,8 @@ ctest --test-dir build/local --output-on-failure
 ./scripts/verify-client-local.sh
 ```
 
+该脚本会同时运行协议 smoke test 和 Qt offscreen UI smoke gate。
+
 如果 SDK 已经被单独安装或导出，可以直接指定 SDK 目录：
 
 ```bash
@@ -131,5 +133,5 @@ gateway 协议不一致。
 ## 下一步
 
 整体路线以“真实多人同屏可玩”为主线，下一步优先补齐房间列表/详情 SDK、
-UI 自动化联调、断线恢复和回放。详细规划见
+主动恢复 battle snapshot、完整 UI 自动化联调和回放。详细规划见
 [docs/production-roadmap.md](docs/production-roadmap.md)。

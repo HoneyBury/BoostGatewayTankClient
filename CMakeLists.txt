@@ -88,6 +88,36 @@ if(BGTC_BUILD_TESTS)
     )
     target_link_libraries(tank_protocol_smoke_test PRIVATE boost_gateway::sdk)
     add_test(NAME tank_protocol_smoke_test COMMAND tank_protocol_smoke_test)
+
+    add_executable(tank_ui_smoke_test
+        tests/qt_ui_smoke_test.cpp
+        src/core/AppConfig.cpp
+        src/core/AppConfig.h
+        src/core/ClientState.h
+        src/core/Diagnostics.h
+        src/sdk/GatewayClient.cpp
+        src/sdk/GatewayClient.h
+        src/tank/TankProtocol.cpp
+        src/tank/TankProtocol.h
+        src/tank/TankWorldModel.h
+        src/ui/BattleWidget.cpp
+        src/ui/BattleWidget.h
+        src/ui/LeaderboardWidget.cpp
+        src/ui/LeaderboardWidget.h
+        src/ui/LobbyWidget.cpp
+        src/ui/LobbyWidget.h
+    )
+    target_include_directories(tank_ui_smoke_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+    target_link_libraries(tank_ui_smoke_test
+        PRIVATE
+            Qt${BGTC_QT_MAJOR}::Widgets
+            boost_gateway::sdk
+    )
+    add_test(NAME tank_ui_smoke_test COMMAND tank_ui_smoke_test)
+    set_tests_properties(tank_ui_smoke_test PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 if(BGTC_BUILD_HEADLESS)
