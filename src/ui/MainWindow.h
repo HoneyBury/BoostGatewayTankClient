@@ -3,6 +3,7 @@
 #include "core/AppConfig.h"
 #include "core/ClientState.h"
 #include "sdk/GatewayClient.h"
+#include "tank/TankWorldModel.h"
 
 #include <QMainWindow>
 
@@ -30,6 +31,7 @@ private:
     void reconnect();
     void setStatus(const QString& text);
     void showPage(int index);
+    void handleTankSnapshot(const bgtc::TankSnapshot& snapshot);
 
     AppConfig config_;
     QString token_;

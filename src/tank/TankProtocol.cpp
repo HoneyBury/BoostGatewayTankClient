@@ -54,6 +54,13 @@ ItemState parseItem(const json& value) {
     return item;
 }
 
+BattleScoreState parseScore(const json& value) {
+    BattleScoreState score;
+    score.userId = value.value("user_id", "");
+    score.score = value.value("score", 0);
+    return score;
+}
+
 std::vector<std::string> split(const std::string& value, char delimiter) {
     std::vector<std::string> parts;
     std::stringstream ss(value);
@@ -151,6 +158,7 @@ std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload) {
 
     TankSnapshot snapshot;
     snapshot.frame = doc.value("frame", doc.value("frame_number", 0));
+    snapshot.totalFrames = doc.value("total_frames", snapshot.frame);
     const auto kind = doc.value("kind", "");
     snapshot.finished = doc.value("finished", kind == "battle_finished" || kind == "finished" || kind == "settlement");
     snapshot.finishReason = doc.value("finish_reason", doc.value("reason", ""));
@@ -191,6 +199,11 @@ std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload) {
     if (doc.contains("items") && doc["items"].is_array()) {
         for (const auto& item : doc["items"]) {
             snapshot.items.push_back(parseItem(item));
+        }
+    }
+    if (doc.contains("scores") && doc["scores"].is_array()) {
+        for (const auto& score : doc["scores"]) {
+            snapshot.scores.push_back(parseScore(score));
         }
     }
     return snapshot;

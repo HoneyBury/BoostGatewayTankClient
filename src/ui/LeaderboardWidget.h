@@ -14,10 +14,13 @@ class LeaderboardWidget final : public QWidget {
 
 public:
     LeaderboardWidget(ClientSession& session, GatewayClient& gateway, QWidget* parent = nullptr);
+    void refreshAfterBattle();
 
 private:
     void refreshTop();
     void refreshMine();
+    [[nodiscard]] QString formatLeaderboardJson(const QString& body) const;
+    [[nodiscard]] QString settlementSummary() const;
     void setOutput(const QString& text);
 
     ClientSession& session_;

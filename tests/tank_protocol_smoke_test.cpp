@@ -35,8 +35,17 @@ int main() {
         R"({"battle_id":"battle_1","kind":"battle_finished","reason":"user_requested","total_frames":2,"winner_user_id":"alice"})");
     assert(liveFinish.has_value());
     assert(liveFinish->finished);
+    assert(liveFinish->totalFrames == 2);
     assert(liveFinish->finishReason == "user_requested");
     assert(liveFinish->winnerUserId == "alice");
+
+    const auto scoredFinish = bgtc::decodeTankSnapshot(
+        R"({"battle_id":"battle_1","kind":"battle_finished","reason":"user_requested","scores":[{"score":3,"user_id":"alice"},{"score":1,"user_id":"bob"}],"total_frames":7,"winner_user_id":"alice"})");
+    assert(scoredFinish.has_value());
+    assert(scoredFinish->scores.size() == 2);
+    assert(scoredFinish->scores[0].userId == "alice");
+    assert(scoredFinish->scores[0].score == 3);
+    assert(scoredFinish->totalFrames == 7);
 
     std::cout << "tank protocol smoke test passed\n";
     return 0;

@@ -25,6 +25,7 @@ private:
     void sendMove(int dx, int dy);
     void sendFire(int direction);
     void drawPanel(QPainter& painter);
+    void drawSettlement(QPainter& painter);
     [[nodiscard]] const TankState* findLocalTank() const;
     [[nodiscard]] QString findFirstOpponentUserId() const;
     [[nodiscard]] QPoint tankToScreen(const TankState& tank) const;

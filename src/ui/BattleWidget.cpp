@@ -64,6 +64,9 @@ void BattleWidget::paintEvent(QPaintEvent*) {
     }
 
     drawPanel(painter);
+    if (snapshot_.finished) {
+        drawSettlement(painter);
+    }
 }
 
 void BattleWidget::keyPressEvent(QKeyEvent* event) {
@@ -152,21 +155,60 @@ void BattleWidget::drawPanel(QPainter& painter) {
     painter.drawText(panelX, 105, QString("Tanks: %1").arg(snapshot_.tanks.size()));
     painter.drawText(panelX, 130, QString("Bullets: %1").arg(snapshot_.bullets.size()));
     painter.drawText(panelX, 155, QString("Items: %1").arg(snapshot_.items.size()));
-    if (snapshot_.battleState.has_value()) {
-        painter.drawText(panelX, 180, "State: " + QString::fromStdString(snapshot_.battleState->kind));
+    if (const auto* localTank = findLocalTank()) {
+        painter.drawText(panelX, 180, QString("HP: %1  Score: %2").arg(localTank->hp).arg(localTank->score));
+        painter.drawText(panelX, 205, QString("Pos: %1,%2").arg(localTank->x).arg(localTank->y));
     }
-    painter.drawText(panelX, 215, "操作:");
-    painter.drawText(panelX, 240, "WASD / 方向键：移动");
-    painter.drawText(panelX, 265, "空格：向上开火");
-    painter.drawText(panelX, 290, "F：结束战斗");
-    painter.drawText(panelX, 325, "规则：以服务端 snapshot 为准");
+    if (snapshot_.battleState.has_value()) {
+        painter.drawText(panelX, 230, "State: " + QString::fromStdString(snapshot_.battleState->kind));
+    }
+    painter.drawText(panelX, 265, "操作:");
+    painter.drawText(panelX, 290, "WASD / 方向键：移动");
+    painter.drawText(panelX, 315, "空格：攻击最近目标");
+    painter.drawText(panelX, 340, "F：结束战斗");
+    painter.drawText(panelX, 375, "规则：以服务端 snapshot 为准");
     if (!lastInput_.isEmpty()) {
-        painter.drawText(panelX, 350, "最近输入: " + lastInput_.left(24));
+        painter.drawText(panelX, 400, "最近输入: " + lastInput_.left(24));
     }
     if (!lastInputError_.isEmpty()) {
         painter.setPen(QColor("#ffb703"));
-        painter.drawText(panelX, 385, "最近输入错误:");
-        painter.drawText(panelX, 410, lastInputError_.left(28));
+        painter.drawText(panelX, 435, "最近输入错误:");
+        painter.drawText(panelX, 460, lastInputError_.left(28));
+    }
+}
+
+void BattleWidget::drawSettlement(QPainter& painter) {
+    const QRect card(72, 70, kMapWidth * kCell - 144, 250);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QColor("#f8f9fa"));
+    painter.setBrush(QColor(20, 28, 38, 235));
+    painter.drawRoundedRect(card, 14, 14);
+
+    painter.setPen(QColor("#ffd166"));
+    painter.drawText(card.adjusted(24, 28, -24, -24), "战斗结算");
+    painter.setPen(QColor("#f8f9fa"));
+    painter.drawText(card.left() + 24,
+                     card.top() + 72,
+                     "胜利玩家: " + QString::fromStdString(snapshot_.winnerUserId.empty() ? "未知" : snapshot_.winnerUserId));
+    painter.drawText(card.left() + 24,
+                     card.top() + 102,
+                     "结束原因: " + QString::fromStdString(snapshot_.finishReason.empty() ? "unknown" : snapshot_.finishReason));
+    painter.drawText(card.left() + 24,
+                     card.top() + 132,
+                     QString("总帧数: %1").arg(snapshot_.totalFrames > 0 ? snapshot_.totalFrames : snapshot_.frame));
+
+    int y = card.top() + 168;
+    painter.setPen(QColor("#8ecae6"));
+    painter.drawText(card.left() + 24, y, "分数:");
+    painter.setPen(QColor("#f8f9fa"));
+    for (const auto& score : snapshot_.scores) {
+        y += 24;
+        painter.drawText(card.left() + 44,
+                         y,
+                         QString::fromStdString(score.userId) + QString(": %1").arg(score.score));
+    }
+    if (snapshot_.scores.empty()) {
+        painter.drawText(card.left() + 44, y + 24, "服务端未返回 scores 字段");
     }
 }
 

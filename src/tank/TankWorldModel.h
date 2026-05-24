@@ -54,8 +54,14 @@ struct BattleStateEvent {
     std::string userId;
 };
 
+struct BattleScoreState {
+    std::string userId;
+    int score = 0;
+};
+
 struct TankSnapshot {
     int frame = 0;
+    int totalFrames = 0;
     bool finished = false;
     std::string finishReason;
     std::string winnerUserId;
@@ -63,6 +69,7 @@ struct TankSnapshot {
     std::vector<BulletState> bullets;
     std::vector<TankEvent> events;
     std::vector<ItemState> items;
+    std::vector<BattleScoreState> scores;
     std::optional<BattleStateEvent> battleState;
 };
 

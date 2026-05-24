@@ -63,6 +63,7 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
         setStatus("Battle started: " + battleId);
     });
     connect(&gateway_, &GatewayClient::tankSnapshotReceived, battle_, &BattleWidget::applySnapshot);
+    connect(&gateway_, &GatewayClient::tankSnapshotReceived, this, &MainWindow::handleTankSnapshot);
     connect(&gateway_, &GatewayClient::disconnected, this, [this]() {
         session_.state = ConnectionState::Disconnected;
         setStatus("Disconnected from gateway.");
@@ -113,6 +114,36 @@ void MainWindow::setStatus(const QString& text) {
 void MainWindow::showPage(int index) {
     if (index >= 0 && index < stack_->count()) {
         stack_->setCurrentIndex(index);
+    }
+}
+
+void MainWindow::handleTankSnapshot(const TankSnapshot& snapshot) {
+    if (!snapshot.finished) {
+        return;
+    }
+
+    session_.state = ConnectionState::InLobby;
+    session_.lastWinnerUserId = QString::fromStdString(snapshot.winnerUserId);
+    session_.lastFinishReason = QString::fromStdString(snapshot.finishReason);
+    session_.lastBattleFrames = snapshot.totalFrames > 0 ? snapshot.totalFrames : snapshot.frame;
+    session_.lastBattleScore = 0;
+    const auto userId = session_.userId.toStdString();
+    for (const auto& score : snapshot.scores) {
+        if (score.userId == userId) {
+            session_.lastBattleScore = score.score;
+            break;
+        }
+    }
+
+    const auto winner = session_.lastWinnerUserId.isEmpty() ? "未知" : session_.lastWinnerUserId;
+    setStatus(QString("Battle finished. winner=%1 frames=%2")
+                  .arg(winner)
+                  .arg(session_.lastBattleFrames));
+    if (leaderboard_ != nullptr) {
+        leaderboard_->refreshAfterBattle();
+    }
+    if (navigation_ != nullptr) {
+        navigation_->setCurrentRow(2);
     }
 }
 

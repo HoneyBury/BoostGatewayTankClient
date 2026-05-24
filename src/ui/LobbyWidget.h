@@ -34,12 +34,15 @@ private:
     void showUnsupportedRoomList();
     void showUnsupportedRoomAdmin();
     void appendLog(const QString& text);
+    void refreshRoomSummary();
+    [[nodiscard]] bool requireRoom(const QString& action);
 
     AppConfig config_;
     ClientSession& session_;
     GatewayClient& gateway_;
     QLineEdit* roomEdit_ = nullptr;
     QLabel* roomState_ = nullptr;
+    QLabel* capabilityState_ = nullptr;
     QListWidget* roomList_ = nullptr;
     QTextEdit* log_ = nullptr;
 };

@@ -15,6 +15,11 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     auto* layout = new QVBoxLayout(this);
     roomState_ = new QLabel("大厅：尚未进入房间", this);
     layout->addWidget(roomState_);
+    capabilityState_ = new QLabel(
+        "当前 SDK：create/join/leave/ready/start 可用；list/detail/admin/register 等待服务端 API。",
+        this);
+    capabilityState_->setWordWrap(true);
+    layout->addWidget(capabilityState_);
 
     roomEdit_ = new QLineEdit(config_.defaultRoom, this);
     layout->addWidget(roomEdit_);
@@ -41,7 +46,8 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     layout->addLayout(row);
 
     roomList_ = new QListWidget(this);
-    roomList_->addItem("房间列表 API 待服务端 SDK 暴露；当前可手动输入 room_id。");
+    roomList_->addItem("可用：手动输入 room_id 创建/加入房间。");
+    roomList_->addItem("待服务端 SDK：房间列表、房间详情、房主操作、邀请/踢人。");
     layout->addWidget(roomList_);
 
     log_ = new QTextEdit(this);
@@ -66,7 +72,7 @@ void LobbyWidget::createRoom() {
     if (gateway_.createRoom(roomId, &error)) {
         session_.roomId = roomId;
         session_.state = ConnectionState::InRoom;
-        roomState_->setText("当前房间：" + roomId + "，等待玩家 ready。");
+        refreshRoomSummary();
         appendLog("创建房间成功：" + roomId);
     } else {
         appendLog("创建房间失败：" + error);
@@ -79,7 +85,7 @@ void LobbyWidget::joinRoom() {
     if (gateway_.joinRoom(roomId, &error)) {
         session_.roomId = roomId;
         session_.state = ConnectionState::InRoom;
-        roomState_->setText("当前房间：" + roomId);
+        refreshRoomSummary();
         appendLog("加入房间成功：" + roomId);
     } else {
         appendLog("加入房间失败：" + error);
@@ -87,23 +93,29 @@ void LobbyWidget::joinRoom() {
 }
 
 void LobbyWidget::leaveRoom() {
+    if (!requireRoom("离开房间")) {
+        return;
+    }
     QString error;
     if (gateway_.leaveRoom(session_.roomId, &error)) {
         appendLog("离开房间：" + session_.roomId);
         session_.roomId.clear();
         session_.ready = false;
         session_.state = ConnectionState::InLobby;
-        roomState_->setText("大厅：尚未进入房间");
+        refreshRoomSummary();
     } else {
         appendLog("离开房间失败：" + error);
     }
 }
 
 void LobbyWidget::setReady() {
+    if (!requireRoom("准备")) {
+        return;
+    }
     QString error;
     if (gateway_.setReady(true, &error)) {
         session_.ready = true;
-        roomState_->setText("当前房间：" + session_.roomId + "，已准备");
+        refreshRoomSummary();
         appendLog("已准备。");
     } else {
         appendLog("准备失败：" + error);
@@ -111,10 +123,13 @@ void LobbyWidget::setReady() {
 }
 
 void LobbyWidget::unsetReady() {
+    if (!requireRoom("取消准备")) {
+        return;
+    }
     QString error;
     if (gateway_.setReady(false, &error)) {
         session_.ready = false;
-        roomState_->setText("当前房间：" + session_.roomId + "，未准备");
+        refreshRoomSummary();
         appendLog("已取消准备。");
     } else {
         appendLog("取消准备失败：" + error);
@@ -122,6 +137,9 @@ void LobbyWidget::unsetReady() {
 }
 
 void LobbyWidget::startBattle() {
+    if (!requireRoom("开始战斗")) {
+        return;
+    }
     QString error;
     QString battleId;
     if (gateway_.startBattle(session_.roomId, &battleId, &error)) {
@@ -140,6 +158,9 @@ void LobbyWidget::refreshLeaderboard() {
 }
 
 void LobbyWidget::showUnsupportedRoomList() {
+    roomList_->clear();
+    roomList_->addItem("房间列表：等待服务端 SDK 暴露 list_rooms/page/filter API。");
+    roomList_->addItem("当前可验证路径：复制/输入 room_id 后 create 或 join。");
     appendLog(gateway_.unsupportedFeatureMessage("房间列表/分页/过滤"));
 }
 
@@ -149,6 +170,25 @@ void LobbyWidget::showUnsupportedRoomAdmin() {
 
 void LobbyWidget::appendLog(const QString& text) {
     log_->append(text);
+}
+
+void LobbyWidget::refreshRoomSummary() {
+    if (session_.roomId.isEmpty()) {
+        roomState_->setText("大厅：尚未进入房间");
+        return;
+    }
+    const auto readyText = session_.ready ? "已准备" : "未准备";
+    const auto battleText = session_.battleId.isEmpty() ? "未开始战斗" : "战斗：" + session_.battleId;
+    roomState_->setText(QString("当前房间：%1 | %2 | %3")
+                            .arg(session_.roomId, readyText, battleText));
+}
+
+bool LobbyWidget::requireRoom(const QString& action) {
+    if (!session_.roomId.isEmpty()) {
+        return true;
+    }
+    appendLog(action + "失败：请先创建或加入房间。");
+    return false;
 }
 
 }  // namespace bgtc
