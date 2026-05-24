@@ -16,6 +16,9 @@ TankState parseTank(const json& value) {
     tank.y = value.value("y", value.value("pos_y", 0));
     tank.hp = value.value("hp", 100);
     tank.direction = value.value("direction", 0);
+    tank.directionX = value.value("direction_x", value.value("dx", 1));
+    tank.directionY = value.value("direction_y", value.value("dy", 0));
+    tank.speedMultiplier = value.value("speed_multiplier", 1);
     tank.alive = value.value("alive", true);
     tank.kills = value.value("kills", 0);
     tank.deaths = value.value("deaths", 0);
@@ -25,7 +28,15 @@ TankState parseTank(const json& value) {
 
 BulletState parseBullet(const json& value) {
     BulletState bullet;
-    bullet.id = value.value("id", std::uint64_t{0});
+    if (value.contains("id")) {
+        if (value["id"].is_string()) {
+            bullet.id = value["id"].get<std::string>();
+        } else if (value["id"].is_number_unsigned()) {
+            bullet.id = std::to_string(value["id"].get<std::uint64_t>());
+        } else if (value["id"].is_number_integer()) {
+            bullet.id = std::to_string(value["id"].get<std::int64_t>());
+        }
+    }
     bullet.x = value.value("x", 0);
     bullet.y = value.value("y", 0);
     bullet.dx = value.value("dx", 0);
@@ -135,6 +146,10 @@ std::string encodeTankInput(const TankInput& input) {
 
 std::string encodeLegacyMoveInput(int x, int y) {
     return "move:" + std::to_string(x) + "," + std::to_string(y);
+}
+
+std::string encodeLegacyFireInput(int dx, int dy) {
+    return "fire:" + std::to_string(dx) + "," + std::to_string(dy);
 }
 
 std::string encodeLegacyAttackInput(const std::string& targetUserId) {

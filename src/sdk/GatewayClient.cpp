@@ -11,7 +11,7 @@ namespace bgtc {
 namespace {
 
 constexpr auto kDefaultTimeout = std::chrono::seconds(5);
-constexpr auto kBattleTimeout = std::chrono::milliseconds(350);
+constexpr auto kBattleTimeout = std::chrono::milliseconds(120);
 
 std::string toStdString(const QString& value) {
     return value.toUtf8().toStdString();
@@ -248,6 +248,20 @@ bool GatewayClient::sendLegacyMoveInput(int x, int y, QString* errorMessage) {
             *errorMessage = formatError(result.error_code, result.error_message);
         }
         recordError(errorMessage ? *errorMessage : "send legacy move failed");
+        return false;
+    }
+    ++diagnostics_.inputsSent;
+    publishDiagnostics();
+    return true;
+}
+
+bool GatewayClient::sendFireDirectionInput(int dx, int dy, QString* errorMessage) {
+    const auto result = client_->send_battle_input(encodeLegacyFireInput(dx, dy), kBattleTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "send fire input failed");
         return false;
     }
     ++diagnostics_.inputsSent;

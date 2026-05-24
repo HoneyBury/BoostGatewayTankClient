@@ -7,6 +7,8 @@
 #include <QWidget>
 
 class QKeyEvent;
+class QPainter;
+class QPixmap;
 class QTimer;
 
 namespace bgtc {
@@ -33,6 +35,9 @@ private:
     void pollBattleState();
     void updateMovementVector();
     void setMovementKey(int key, bool pressed);
+    void predictLocalTank(int gridX, int gridY, int dx, int dy);
+    void drawTank(QPainter& painter, const QRect& mapRect, const TankState& tank);
+    void drawBullet(QPainter& painter, const QRect& mapRect, const BulletState& bullet);
     void drawPanel(QPainter& painter);
     void drawSettlement(QPainter& painter);
     [[nodiscard]] const TankState* findLocalTank() const;
@@ -51,6 +56,8 @@ private:
     int fallbackGridY_ = 0;
     int activeDx_ = 0;
     int activeDy_ = 0;
+    int facingDx_ = 1;
+    int facingDy_ = 0;
     bool keyUp_ = false;
     bool keyDown_ = false;
     bool keyLeft_ = false;

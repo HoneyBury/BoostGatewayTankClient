@@ -222,6 +222,19 @@ int main(int argc, char* argv[]) {
                        ? pickup.error_message
                        : pickup_state.response_body);
 
+    const auto fire = alice.send_battle_input(bgtc::encodeLegacyFireInput(1, 0), timeout);
+    std::this_thread::sleep_for(150ms);
+    const auto bullet_state = alice.battle_state(start.battle_id, timeout);
+    const auto bullet_snapshot = bgtc::decodeTankSnapshot(bullet_state.response_body);
+    state.add_step("fire_spawns_bullet",
+                   fire.ok &&
+                       bullet_state.ok &&
+                       bullet_snapshot.has_value() &&
+                       !bullet_snapshot->bullets.empty(),
+                   bullet_state.response_body.empty()
+                       ? fire.error_message
+                       : bullet_state.response_body);
+
     const auto battle_state = alice.battle_state(start.battle_id, timeout);
     const auto restored_snapshot = bgtc::decodeTankSnapshot(battle_state.response_body);
     state.add_step("battle_state_query",

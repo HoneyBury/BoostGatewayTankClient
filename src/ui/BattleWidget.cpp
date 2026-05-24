@@ -3,8 +3,12 @@
 #include "tank/TankProtocol.h"
 
 #include <QFont>
+#include <QCoreApplication>
+#include <QEventLoop>
 #include <QKeyEvent>
 #include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
 #include <QTimer>
 #include <algorithm>
 
@@ -17,8 +21,8 @@ constexpr int kMapWidth = 20;
 constexpr int kMapHeight = 15;
 constexpr int kMapMargin = 18;
 constexpr int kPanelWidth = 340;
-constexpr int kMoveIntervalMs = 120;
-constexpr int kSnapshotPollMs = 250;
+constexpr int kMoveIntervalMs = 70;
+constexpr int kSnapshotPollMs = 80;
 
 int clampGridX(int x) {
     return std::clamp(x, 0, kMapWidth - 1);
@@ -34,6 +38,25 @@ int gridToWorld(int value) {
 
 int worldToGrid(int value, int maxGrid) {
     return std::clamp((value + kWorldCell / 2) / kWorldCell, 0, maxGrid);
+}
+
+void drawTankBody(QPainter& painter, const QRect& rect, const QColor& body, const QColor& accent) {
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setBrush(body);
+    painter.setPen(QPen(accent.lighter(130), 2));
+    painter.drawRoundedRect(rect.adjusted(4, 5, -4, -5), 7, 7);
+    painter.setBrush(body.darker(125));
+    painter.drawRoundedRect(rect.adjusted(8, 10, -8, -10), 5, 5);
+    painter.setBrush(accent);
+    painter.setPen(Qt::NoPen);
+    painter.drawEllipse(rect.center(), 5, 5);
+    painter.restore();
+}
+
+QPoint bulletToScreen(const BulletState& bullet) {
+    return QPoint(worldToGrid(bullet.x, kMapWidth - 1) * kCell + kCell / 2,
+                  worldToGrid(bullet.y, kMapHeight - 1) * kCell + kCell / 2);
 }
 
 }  // namespace
@@ -63,6 +86,8 @@ void BattleWidget::applySnapshot(TankSnapshot snapshot) {
         const auto grid = tankToGrid(*localTank);
         fallbackGridX_ = grid.x();
         fallbackGridY_ = grid.y();
+        facingDx_ = localTank->directionX;
+        facingDy_ = localTank->directionY;
     }
     update();
 }
@@ -89,12 +114,6 @@ void BattleWidget::paintEvent(QPaintEvent*) {
         painter.drawLine(mapRect.left(), mapRect.top() + y * kCell, mapRect.right(), mapRect.top() + y * kCell);
     }
 
-    for (const auto& bullet : snapshot_.bullets) {
-        painter.setBrush(QColor("#ffd166"));
-        painter.setPen(Qt::NoPen);
-        painter.drawEllipse(mapRect.left() + bullet.x * kCell + 10, mapRect.top() + bullet.y * kCell + 10, 12, 12);
-    }
-
     for (const auto& item : snapshot_.items) {
         painter.setBrush(QColor("#5cc8ff"));
         painter.setPen(QColor("#bdefff"));
@@ -111,20 +130,11 @@ void BattleWidget::paintEvent(QPaintEvent*) {
     }
 
     for (const auto& tank : snapshot_.tanks) {
-        const auto screen = tankToScreen(tank);
-        const bool isLocal = tank.userId == session_.userId.toStdString();
-        painter.setBrush(isLocal ? QColor("#26d9a1") : QColor("#ff5c7a"));
-        painter.setPen(QPen(isLocal ? QColor("#b8ffe9") : QColor("#ffd2dc"), 2));
-        painter.drawRoundedRect(mapRect.left() + screen.x() + 4,
-                                mapRect.top() + screen.y() + 4,
-                                kCell - 8,
-                                kCell - 8,
-                                6,
-                                6);
-        painter.setPen(QColor("#ffffff"));
-        painter.drawText(mapRect.left() + screen.x() + 7,
-                         mapRect.top() + screen.y() + 20,
-                         QString::fromStdString(tank.userId.substr(0, 2)));
+        drawTank(painter, mapRect, tank);
+    }
+
+    for (const auto& bullet : snapshot_.bullets) {
+        drawBullet(painter, mapRect, bullet);
     }
 
     drawPanel(painter);
@@ -250,10 +260,16 @@ void BattleWidget::updateMovementVector() {
     if (rawDx != 0) {
         activeDx_ = rawDx;
         activeDy_ = 0;
+        facingDx_ = rawDx;
+        facingDy_ = 0;
         return;
     }
     activeDx_ = 0;
     activeDy_ = rawDy;
+    if (rawDy != 0) {
+        facingDx_ = 0;
+        facingDy_ = rawDy;
+    }
 }
 
 void BattleWidget::sendMove(int dx, int dy) {
@@ -270,14 +286,24 @@ void BattleWidget::sendMove(int dx, int dy) {
         currentGridY = grid.y();
     }
 
-    const int targetGridX = clampGridX(currentGridX + dx);
-    const int targetGridY = clampGridY(currentGridY + dy);
+    const int multiplier = localTank != nullptr ? std::max(1, localTank->speedMultiplier) : 1;
+    const int targetGridX = clampGridX(currentGridX + dx * multiplier);
+    const int targetGridY = clampGridY(currentGridY + dy * multiplier);
     if (targetGridX == currentGridX && targetGridY == currentGridY) {
         return;
     }
 
     const int targetX = gridToWorld(targetGridX);
     const int targetY = gridToWorld(targetGridY);
+
+    ++nextSeq_;
+    fallbackGridX_ = targetGridX;
+    fallbackGridY_ = targetGridY;
+    predictLocalTank(targetGridX, targetGridY, dx, dy);
+    lastInput_ = QString("move:%1,%2").arg(targetGridX).arg(targetGridY);
+    lastInputError_.clear();
+    update();
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
     inputBusy_ = true;
     QString error;
@@ -288,31 +314,19 @@ void BattleWidget::sendMove(int dx, int dy) {
         return;
     }
     inputBusy_ = false;
-    ++nextSeq_;
-    fallbackGridX_ = targetGridX;
-    fallbackGridY_ = targetGridY;
-    lastInput_ = QString("move:%1,%2").arg(targetGridX).arg(targetGridY);
-    lastInputError_.clear();
     update();
 }
 
 void BattleWidget::sendFire(int direction) {
     (void)direction;
-    const auto targetUserId = findFirstOpponentUserId();
-    if (targetUserId.isEmpty()) {
-        lastInputError_ = "当前 snapshot 中没有可攻击目标";
-        update();
-        return;
-    }
-
     QString error;
-    if (!gateway_.sendAttackInput(targetUserId, &error)) {
+    if (!gateway_.sendFireDirectionInput(facingDx_, facingDy_, &error)) {
         lastInputError_ = error;
         update();
         return;
     }
     ++nextSeq_;
-    lastInput_ = "attack:" + targetUserId;
+    lastInput_ = QString("fire:%1,%2").arg(facingDx_).arg(facingDy_);
     lastInputError_.clear();
     update();
 }
@@ -387,6 +401,8 @@ void BattleWidget::drawPanel(QPainter& painter) {
         painter.drawText(panelX, y, QString("HP %1    Score %2").arg(localTank->hp).arg(localTank->score));
         y += 24;
         painter.drawText(panelX, y, QString("Grid %1, %2").arg(grid.x()).arg(grid.y()));
+        y += 24;
+        painter.drawText(panelX, y, QString("Speed x%1").arg(std::max(1, localTank->speedMultiplier)));
     }
     if (snapshot_.battleState.has_value()) {
         y += 30;
@@ -404,7 +420,7 @@ void BattleWidget::drawPanel(QPainter& painter) {
     painter.setPen(QColor("#e8f1f8"));
     painter.drawText(panelX, y, "WASD / 方向键：按网格移动");
     y += 24;
-    painter.drawText(panelX, y, "空格：攻击最近目标");
+    painter.drawText(panelX, y, "空格：按朝向发射子弹");
     y += 24;
     painter.drawText(panelX, y, "E：拾取首个道具");
     y += 24;
@@ -432,6 +448,54 @@ QString BattleWidget::findFirstItemId() const {
         return {};
     }
     return QString::fromStdString(snapshot_.items.front().id);
+}
+
+void BattleWidget::predictLocalTank(int gridX, int gridY, int dx, int dy) {
+    const auto userId = session_.userId.toStdString();
+    for (auto& tank : snapshot_.tanks) {
+        if (tank.userId == userId) {
+            tank.x = gridToWorld(gridX);
+            tank.y = gridToWorld(gridY);
+            tank.directionX = dx;
+            tank.directionY = dy;
+            return;
+        }
+    }
+}
+
+void BattleWidget::drawTank(QPainter& painter, const QRect& mapRect, const TankState& tank) {
+    const auto screen = tankToScreen(tank);
+    const bool isLocal = tank.userId == session_.userId.toStdString();
+    const QRect rect(mapRect.left() + screen.x(), mapRect.top() + screen.y(), kCell, kCell);
+    const QColor body = isLocal ? QColor("#26d9a1") : QColor("#ff5c7a");
+    const QColor accent = isLocal ? QColor("#b8ffe9") : QColor("#ffd2dc");
+    drawTankBody(painter, rect, body, accent);
+
+    const QPoint center = rect.center();
+    const int dirX = tank.directionX == 0 && tank.directionY == 0 ? 1 : tank.directionX;
+    const int dirY = tank.directionX == 0 && tank.directionY == 0 ? 0 : tank.directionY;
+    painter.setPen(QPen(accent, 4, Qt::SolidLine, Qt::RoundCap));
+    painter.drawLine(center, center + QPoint(dirX * 17, dirY * 17));
+
+    painter.setPen(QColor("#ffffff"));
+    QFont labelFont = painter.font();
+    labelFont.setPixelSize(11);
+    labelFont.setBold(true);
+    painter.setFont(labelFont);
+    painter.drawText(rect.adjusted(5, 7, -5, -5), Qt::AlignCenter, QString::fromStdString(tank.userId.substr(0, 2)));
+}
+
+void BattleWidget::drawBullet(QPainter& painter, const QRect& mapRect, const BulletState& bullet) {
+    const auto pos = bulletToScreen(bullet);
+    const QPoint center(mapRect.left() + pos.x(), mapRect.top() + pos.y());
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor("#ffd166"));
+    painter.drawEllipse(center, 6, 6);
+    painter.setBrush(QColor(255, 209, 102, 80));
+    painter.drawEllipse(center - QPoint(bullet.dx * 8, bullet.dy * 8), 10, 10);
+    painter.restore();
 }
 
 void BattleWidget::drawSettlement(QPainter& painter) {

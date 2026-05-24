@@ -13,6 +13,9 @@ struct TankState {
     int y = 0;
     int hp = 100;
     int direction = 0;
+    int directionX = 1;
+    int directionY = 0;
+    int speedMultiplier = 1;
     bool alive = true;
     int kills = 0;
     int deaths = 0;
@@ -20,7 +23,7 @@ struct TankState {
 };
 
 struct BulletState {
-    std::uint64_t id = 0;
+    std::string id;
     int x = 0;
     int y = 0;
     int dx = 0;

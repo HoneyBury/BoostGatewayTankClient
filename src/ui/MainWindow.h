@@ -9,7 +9,7 @@
 
 class QStackedWidget;
 class QLabel;
-class QListWidget;
+class QPushButton;
 
 namespace bgtc {
 
@@ -31,6 +31,9 @@ private:
     void reconnect();
     void setStatus(const QString& text);
     void showPage(int index);
+    void showLobby();
+    void showBattle();
+    void showLoadingThenBattle(const QString& battleId);
     void handleTankSnapshot(const bgtc::TankSnapshot& snapshot);
     bool restoreBattleSnapshot();
     QString activeBattleIdFromRoomDetail(const QString& roomId);
@@ -39,7 +42,8 @@ private:
     QString token_;
     ClientSession session_;
     GatewayClient gateway_;
-    QListWidget* navigation_ = nullptr;
+    QPushButton* backButton_ = nullptr;
+    QPushButton* lobbyButton_ = nullptr;
     QStackedWidget* stack_ = nullptr;
     LobbyWidget* lobby_ = nullptr;
     BattleWidget* battle_ = nullptr;

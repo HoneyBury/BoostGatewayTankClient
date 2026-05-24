@@ -9,6 +9,8 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QMenu>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTextEdit>
 #include <QVBoxLayout>
@@ -79,6 +81,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     layout->addLayout(row);
 
     roomList_ = new QListWidget(this);
+    roomList_->setContextMenuPolicy(Qt::CustomContextMenu);
     roomList_->addItem("点击“刷新房间列表”从 gateway 查询真实房间。");
     roomList_->addItem("选中房间后会自动填入 room_id，可直接加入或查看详情。");
     layout->addWidget(roomList_);
@@ -100,6 +103,19 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     connect(transferButton, &QPushButton::clicked, this, &LobbyWidget::transferRoomOwner);
     connect(leaderboardButton, &QPushButton::clicked, this, &LobbyWidget::refreshLeaderboard);
     connect(roomList_, &QListWidget::itemClicked, this, &LobbyWidget::selectRoomFromList);
+    connect(roomList_, &QListWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        auto* item = roomList_->itemAt(pos);
+        if (item == nullptr || item->data(Qt::UserRole).toString().isEmpty()) {
+            return;
+        }
+        roomList_->setCurrentItem(item);
+        selectRoomFromList(item);
+        QMenu menu(this);
+        auto* joinAction = menu.addAction("加入房间");
+        if (menu.exec(roomList_->viewport()->mapToGlobal(pos)) == joinAction) {
+            joinRoom();
+        }
+    });
     connect(&gateway_, &GatewayClient::pushReceived, this, &LobbyWidget::appendLog);
 }
 
@@ -113,6 +129,7 @@ void LobbyWidget::createRoom() {
         appendLog("创建房间成功：" + roomId + "，请点击“准备”。");
     } else {
         appendLog("创建房间失败：" + error);
+        QMessageBox::warning(this, "创建房间失败", error);
     }
 }
 
@@ -126,6 +143,7 @@ void LobbyWidget::joinRoom() {
         appendLog("加入房间成功：" + roomId + "，请确认准备状态。");
     } else {
         appendLog("加入房间失败：" + error);
+        QMessageBox::warning(this, "加入房间失败", error);
     }
 }
 
@@ -142,6 +160,7 @@ void LobbyWidget::leaveRoom() {
         refreshRoomSummary();
     } else {
         appendLog("离开房间失败：" + error);
+        QMessageBox::warning(this, "离开房间失败", error);
     }
 }
 
@@ -156,6 +175,7 @@ void LobbyWidget::setReady() {
         appendLog("已准备，等待房主开始战斗。");
     } else {
         appendLog("准备失败：" + error);
+        QMessageBox::warning(this, "准备失败", error);
     }
 }
 
@@ -170,6 +190,7 @@ void LobbyWidget::unsetReady() {
         appendLog("已取消准备，可以调整后再次准备。");
     } else {
         appendLog("取消准备失败：" + error);
+        QMessageBox::warning(this, "取消准备失败", error);
     }
 }
 
@@ -184,6 +205,7 @@ void LobbyWidget::startBattle() {
         emit battleStarted(battleId);
     } else {
         appendLog("开始战斗失败：" + error);
+        QMessageBox::warning(this, "开始战斗失败", error);
     }
 }
 

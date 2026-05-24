@@ -11,11 +11,14 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
-#include <QListWidget>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QProgressBar>
+#include <QPushButton>
 #include <QStackedWidget>
 #include <QStatusBar>
+#include <QTimer>
+#include <QVBoxLayout>
 #include <QWidget>
 
 namespace bgtc {
@@ -34,25 +37,6 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
         QWidget {
             color: #dfe7ef;
             font-size: 14px;
-        }
-        QListWidget#MainNavigation {
-            background: #111c28;
-            border: 1px solid #243447;
-            border-radius: 16px;
-            padding: 10px;
-            outline: 0;
-        }
-        QListWidget#MainNavigation::item {
-            border-radius: 10px;
-            margin: 3px 0;
-            padding: 12px 14px;
-        }
-        QListWidget#MainNavigation::item:selected {
-            background: #1f8a70;
-            color: #ffffff;
-        }
-        QListWidget#MainNavigation::item:hover:!selected {
-            background: #1a2a3a;
         }
         QLabel#PageTitle {
             color: #f7fbff;
@@ -105,17 +89,37 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
             background: #0f1720;
             color: #dfe7ef;
         }
+        QWidget#TopBar {
+            background: #101a25;
+            border: 1px solid #26384a;
+            border-radius: 18px;
+        }
     )");
 
     auto* shell = new QWidget(this);
-    auto* shellLayout = new QHBoxLayout(shell);
+    auto* shellLayout = new QVBoxLayout(shell);
     shellLayout->setContentsMargins(18, 18, 18, 14);
-    shellLayout->setSpacing(18);
-    navigation_ = new QListWidget(shell);
-    navigation_->setObjectName("MainNavigation");
-    navigation_->addItems({"大厅 Lobby", "战斗 Battle", "排行榜", "回放", "诊断", "设置"});
-    navigation_->setFixedWidth(172);
-    navigation_->setSpacing(2);
+    shellLayout->setSpacing(14);
+
+    auto* topBar = new QWidget(shell);
+    topBar->setObjectName("TopBar");
+    auto* topLayout = new QHBoxLayout(topBar);
+    topLayout->setContentsMargins(14, 10, 14, 10);
+    auto* title = new QLabel("BoostGateway Tank Arena", topBar);
+    title->setObjectName("PageTitle");
+    backButton_ = new QPushButton("返回大厅", topBar);
+    lobbyButton_ = new QPushButton("大厅/房间", topBar);
+    auto* leaderboardButton = new QPushButton("排行榜", topBar);
+    auto* replayButton = new QPushButton("回放", topBar);
+    auto* diagnosticsButton = new QPushButton("诊断", topBar);
+    auto* settingsButton = new QPushButton("设置", topBar);
+    topLayout->addWidget(title, 1);
+    topLayout->addWidget(backButton_);
+    topLayout->addWidget(lobbyButton_);
+    topLayout->addWidget(leaderboardButton);
+    topLayout->addWidget(replayButton);
+    topLayout->addWidget(diagnosticsButton);
+    topLayout->addWidget(settingsButton);
 
     stack_ = new QStackedWidget(shell);
     lobby_ = new LobbyWidget(config_, session_, gateway_, this);
@@ -132,10 +136,10 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
     stack_->addWidget(diagnostics_);
     stack_->addWidget(settings_);
 
-    shellLayout->addWidget(navigation_);
+    shellLayout->addWidget(topBar);
     shellLayout->addWidget(stack_, 1);
     setCentralWidget(shell);
-    navigation_->setCurrentRow(0);
+    showLobby();
 
     statusLabel_ = new QLabel(this);
     statusLabel_->setObjectName("PageHint");
@@ -143,12 +147,16 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
     auto* reconnectAction = menuBar()->addAction("重连");
     connect(reconnectAction, &QAction::triggered, this, &MainWindow::reconnect);
 
-    connect(navigation_, &QListWidget::currentRowChanged, this, &MainWindow::showPage);
+    connect(backButton_, &QPushButton::clicked, this, &MainWindow::showLobby);
+    connect(lobbyButton_, &QPushButton::clicked, this, &MainWindow::showLobby);
+    connect(leaderboardButton, &QPushButton::clicked, this, [this]() { showPage(2); });
+    connect(replayButton, &QPushButton::clicked, this, [this]() { showPage(3); });
+    connect(diagnosticsButton, &QPushButton::clicked, this, [this]() { showPage(4); });
+    connect(settingsButton, &QPushButton::clicked, this, [this]() { showPage(5); });
     connect(lobby_, &LobbyWidget::battleStarted, this, [this](const QString& battleId) {
         session_.battleId = battleId;
         session_.state = ConnectionState::InBattle;
-        navigation_->setCurrentRow(1);
-        setStatus("战斗已开始：" + battleId);
+        showLoadingThenBattle(battleId);
     });
     connect(&gateway_, &GatewayClient::tankSnapshotReceived, battle_, &BattleWidget::applySnapshot);
     connect(&gateway_, &GatewayClient::tankSnapshotReceived, this, &MainWindow::handleTankSnapshot);
@@ -158,9 +166,9 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
         }
         session_.state = inBattle ? ConnectionState::InBattle : ConnectionState::InRoom;
         if (inBattle) {
-            navigation_->setCurrentRow(1);
+            showBattle();
         } else {
-            navigation_->setCurrentRow(0);
+            showLobby();
         }
         setStatus(QString("服务端恢复会话：room=%1，battle=%2")
                       .arg(session_.roomId.isEmpty() ? "未知" : session_.roomId)
@@ -212,7 +220,7 @@ void MainWindow::reconnect() {
     }
     if (restoreBattleSnapshot()) {
         session_.state = ConnectionState::InBattle;
-        navigation_->setCurrentRow(1);
+        showBattle();
         setStatus("重连成功，已从服务端恢复最新战斗 snapshot。");
         return;
     }
@@ -227,7 +235,59 @@ void MainWindow::setStatus(const QString& text) {
 void MainWindow::showPage(int index) {
     if (index >= 0 && index < stack_->count()) {
         stack_->setCurrentIndex(index);
+        if (backButton_ != nullptr) {
+            backButton_->setVisible(index != 0);
+        }
     }
+}
+
+void MainWindow::showLobby() {
+    showPage(0);
+}
+
+void MainWindow::showBattle() {
+    showPage(1);
+    battle_->setFocus(Qt::OtherFocusReason);
+    setStatus("已进入战斗：" + (session_.battleId.isEmpty() ? "等待 battle id" : session_.battleId));
+}
+
+void MainWindow::showLoadingThenBattle(const QString& battleId) {
+    auto* loading = new QWidget(this);
+    auto* layout = new QVBoxLayout(loading);
+    layout->setContentsMargins(56, 56, 56, 56);
+    layout->setSpacing(18);
+    auto* title = new QLabel("正在载入战斗", loading);
+    title->setObjectName("PageTitle");
+    auto* hint = new QLabel(QString("Battle: %1\nRoom: %2\n玩家: %3\n正在等待服务端分配出生点、生成道具与同步初始状态...")
+                                .arg(battleId, session_.roomId, session_.userId),
+                            loading);
+    hint->setObjectName("PageHint");
+    hint->setWordWrap(true);
+    auto* progress = new QProgressBar(loading);
+    progress->setRange(0, 100);
+    progress->setValue(15);
+    layout->addStretch(1);
+    layout->addWidget(title);
+    layout->addWidget(hint);
+    layout->addWidget(progress);
+    layout->addStretch(2);
+
+    const int loadingIndex = stack_->addWidget(loading);
+    showPage(loadingIndex);
+    setStatus("战斗加载中：" + battleId);
+
+    auto* timer = new QTimer(loading);
+    timer->setInterval(90);
+    connect(timer, &QTimer::timeout, this, [this, progress, loading, loadingIndex, timer]() {
+        progress->setValue(std::min(100, progress->value() + 8));
+        if (progress->value() >= 100) {
+            timer->stop();
+            showBattle();
+            stack_->removeWidget(loading);
+            loading->deleteLater();
+        }
+    });
+    timer->start();
 }
 
 void MainWindow::handleTankSnapshot(const TankSnapshot& snapshot) {
@@ -262,9 +322,7 @@ void MainWindow::handleTankSnapshot(const TankSnapshot& snapshot) {
     if (leaderboard_ != nullptr) {
         leaderboard_->refreshAfterBattle();
     }
-    if (navigation_ != nullptr) {
-        navigation_->setCurrentRow(2);
-    }
+    showPage(2);
 }
 
 QString MainWindow::activeBattleIdFromRoomDetail(const QString& roomId) {
