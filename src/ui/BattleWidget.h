@@ -14,6 +14,8 @@ class BattleWidget final : public QWidget {
 public:
     BattleWidget(ClientSession& session, GatewayClient& gateway, QWidget* parent = nullptr);
 
+    [[nodiscard]] bgtc::TankSnapshot currentSnapshot() const;
+
 public slots:
     void applySnapshot(bgtc::TankSnapshot snapshot);
 

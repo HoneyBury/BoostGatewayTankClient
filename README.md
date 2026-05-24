@@ -82,7 +82,6 @@ BGTC_GATEWAY_PORT=9201 \
 
 当前客户端状态：
 
-- 登录窗口：支持 host、port、user id、token 输入。
 - 登录窗口：支持注册账号、连接登录、host、port、user id、token 输入。
 - 大厅窗口：支持创建房间、加入房间、准备、开始战斗、离开房间、查询排行榜、
   房间列表、房间详情、踢出成员和转让房主。
@@ -90,9 +89,12 @@ BGTC_GATEWAY_PORT=9201 \
   结算卡片，WASD/方向键发送真实 `move:x,y`，空格发送 `attack:user_id`，
   F 发送 `finish:reason`。
 - 排行榜窗口：支持格式化展示 top/rank，并在战斗结束后显示最近一局结算摘要。
-- 回放窗口：支持加载当前 battle_id 的服务端回放帧 JSON。
+- 回放窗口：支持加载当前 battle_id 的服务端回放帧，提供播放、暂停、上一帧、
+  下一帧和倍速控制，并复用战斗画面渲染回放帧。
+- 设置窗口：支持保存 gateway host/port、默认房间、玩家前缀和当前 token 到本地 profile。
 - Headless gate：支持对运行中的 gateway 执行注册、三客户端房间管理、战斗、
   重连恢复、回放和排行榜闭环验证。
+- UI flow gate：支持 offscreen 验证本地 profile、回放解析/播放入口和核心 Qt 页面构造。
 
 当前阶段目标是“可验证可联调的 MVP”，不是最终美术品质。
 
@@ -135,7 +137,7 @@ gateway 协议不一致。
 
 ## 下一步
 
-整体路线以“真实多人同屏可玩”为主线。当前已接入 battle state 查询并可在重连后
-主动恢复最新 snapshot；下一步优先推进完整 UI 自动化联调、真断线恢复场景、回放
-和道具协议。详细规划见
+整体路线以“真实多人同屏可玩”为主线。当前已完成真实 SDK 接入、房间大厅、
+多人战斗、排行榜结算、重连后主动恢复 latest snapshot、可播放回放、本地 profile
+和 UI flow gate。下一步优先推进道具协议与玩法表现、桌面端打包发布。详细规划见
 [docs/production-roadmap.md](docs/production-roadmap.md)。

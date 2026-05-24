@@ -1,4 +1,4 @@
-#include "core/AppConfig.h"
+#include "core/ClientProfile.h"
 #include "ui/LoginWindow.h"
 
 #include <QApplication>
@@ -8,8 +8,8 @@ int main(int argc, char* argv[]) {
     QApplication::setApplicationName("BoostGateway Tank Client");
     QApplication::setApplicationVersion(BGTC_APP_VERSION);
 
-    auto config = bgtc::AppConfig::fromEnvironment();
-    bgtc::LoginWindow window(config);
+    const auto profile = bgtc::loadClientProfile();
+    bgtc::LoginWindow window(profile.config, profile.userId, profile.token);
     window.resize(520, 360);
     window.show();
 

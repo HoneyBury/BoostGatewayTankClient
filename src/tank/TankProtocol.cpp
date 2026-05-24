@@ -236,6 +236,44 @@ std::optional<BattleStateEvent> decodeBattleStateEvent(const std::string& payloa
     return event;
 }
 
+std::optional<ReplayTimeline> decodeReplayTimeline(const std::string& payload) {
+    auto doc = json::parse(payload, nullptr, false);
+    if (doc.is_discarded() || !doc.is_object()) {
+        return std::nullopt;
+    }
+
+    const auto replayDoc = doc.contains("replay") && doc["replay"].is_object() ? doc["replay"] : doc;
+    if (!replayDoc.contains("frames") || !replayDoc["frames"].is_array()) {
+        return std::nullopt;
+    }
+
+    ReplayTimeline timeline;
+    timeline.battleId = replayDoc.value("battle_id", doc.value("battle_id", ""));
+    for (const auto& frameDoc : replayDoc["frames"]) {
+        if (!frameDoc.is_object() || !frameDoc.contains("snapshot")) {
+            continue;
+        }
+        const auto snapshotText = frameDoc["snapshot"].dump();
+        auto snapshot = decodeTankSnapshot(snapshotText);
+        if (!snapshot.has_value()) {
+            continue;
+        }
+        ReplayFrame frame;
+        frame.frameNumber = frameDoc.value("frame_number", snapshot->frame);
+        frame.timestamp = frameDoc.value("timestamp", std::int64_t{0});
+        frame.snapshot = std::move(*snapshot);
+        if (frame.snapshot.frame == 0) {
+            frame.snapshot.frame = frame.frameNumber;
+        }
+        timeline.frames.push_back(std::move(frame));
+    }
+
+    if (timeline.frames.empty()) {
+        return std::nullopt;
+    }
+    return timeline;
+}
+
 TankInput makeMoveInput(std::uint64_t seq, int dx, int dy) {
     return TankInput{seq, {TankAction{TankActionType::Move, dx, dy, 0}}};
 }

@@ -34,6 +34,8 @@ add_executable(boost_gateway_tank_client
     src/core/AppConfig.cpp
     src/core/AppConfig.h
     src/core/ClientState.h
+    src/core/ClientProfile.cpp
+    src/core/ClientProfile.h
     src/core/Diagnostics.h
     src/sdk/GatewayClient.cpp
     src/sdk/GatewayClient.h
@@ -94,6 +96,8 @@ if(BGTC_BUILD_TESTS)
         src/core/AppConfig.cpp
         src/core/AppConfig.h
         src/core/ClientState.h
+        src/core/ClientProfile.cpp
+        src/core/ClientProfile.h
         src/core/Diagnostics.h
         src/sdk/GatewayClient.cpp
         src/sdk/GatewayClient.h
@@ -106,6 +110,8 @@ if(BGTC_BUILD_TESTS)
         src/ui/LeaderboardWidget.h
         src/ui/LobbyWidget.cpp
         src/ui/LobbyWidget.h
+        src/ui/ReplayWidget.cpp
+        src/ui/ReplayWidget.h
     )
     target_include_directories(tank_ui_smoke_test
         PRIVATE
@@ -118,6 +124,38 @@ if(BGTC_BUILD_TESTS)
     )
     add_test(NAME tank_ui_smoke_test COMMAND tank_ui_smoke_test)
     set_tests_properties(tank_ui_smoke_test PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    add_executable(tank_ui_flow_test
+        tests/tank_ui_flow_test.cpp
+        src/core/AppConfig.cpp
+        src/core/AppConfig.h
+        src/core/ClientProfile.cpp
+        src/core/ClientProfile.h
+        src/core/ClientState.h
+        src/core/Diagnostics.h
+        src/sdk/GatewayClient.cpp
+        src/sdk/GatewayClient.h
+        src/tank/TankProtocol.cpp
+        src/tank/TankProtocol.h
+        src/tank/TankWorldModel.h
+        src/ui/BattleWidget.cpp
+        src/ui/BattleWidget.h
+        src/ui/ReplayWidget.cpp
+        src/ui/ReplayWidget.h
+        src/ui/SettingsWidget.cpp
+        src/ui/SettingsWidget.h
+    )
+    target_include_directories(tank_ui_flow_test
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+    target_link_libraries(tank_ui_flow_test
+        PRIVATE
+            Qt${BGTC_QT_MAJOR}::Widgets
+            boost_gateway::sdk
+    )
+    add_test(NAME tank_ui_flow_test COMMAND tank_ui_flow_test)
+    set_tests_properties(tank_ui_flow_test PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 if(BGTC_BUILD_HEADLESS)

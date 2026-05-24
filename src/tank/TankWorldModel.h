@@ -73,4 +73,15 @@ struct TankSnapshot {
     std::optional<BattleStateEvent> battleState;
 };
 
+struct ReplayFrame {
+    int frameNumber = 0;
+    std::int64_t timestamp = 0;
+    TankSnapshot snapshot;
+};
+
+struct ReplayTimeline {
+    std::string battleId;
+    std::vector<ReplayFrame> frames;
+};
+
 }  // namespace bgtc

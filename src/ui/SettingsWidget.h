@@ -7,6 +7,8 @@
 #include <QWidget>
 
 class QLabel;
+class QLineEdit;
+class QSpinBox;
 
 namespace bgtc {
 
@@ -21,10 +23,16 @@ public:
 
 private:
     void refresh();
+    void saveProfile();
 
     AppConfig& config_;
     ClientSession& session_;
     GatewayClient& gateway_;
+    QLineEdit* hostEdit_ = nullptr;
+    QSpinBox* portEdit_ = nullptr;
+    QLineEdit* defaultRoomEdit_ = nullptr;
+    QLineEdit* playerPrefixEdit_ = nullptr;
+    QLineEdit* tokenEdit_ = nullptr;
     QLabel* summary_ = nullptr;
 };
 

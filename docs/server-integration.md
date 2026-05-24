@@ -138,22 +138,22 @@ runtime/validation/tank-client-headless-summary.json
 - finish / settlement 能写入排行榜。
 - 回放可查询并能被客户端渲染。
 
-当前自动化已经包含 headless bot、Qt offscreen UI smoke 和真实 live gate。
-live gate 会自动启动服务端栈，并覆盖双客户端登录、建房、加入、ready、start、
-房间列表、房间详情、战斗输入、battle state 查询恢复、真断线重连恢复、finish
-与 leaderboard。后续完整 UI 自动化应继续覆盖真实登录、建房、加入、ready、
-start 和图形界面的恢复状态断言。
+当前自动化已经包含 headless bot、Qt offscreen UI smoke、Qt UI flow 和真实 live gate。
+live gate 会自动启动服务端栈，并覆盖注册、三客户端登录、建房、加入、踢人、
+转让房主、ready、start、房间列表、房间详情、战斗输入、battle state 查询恢复、
+真断线重连恢复、finish、回放加载与 leaderboard。UI flow gate 覆盖本地 profile
+隔离、回放 timeline 解析/渲染入口和核心 Qt 页面构造。
 
 ## 联调风险
 
-- 当前客户端已能消费 SDK 和真实 battle push；房间列表、房间详情、battle state
-  查询恢复已通过 SDK 和 live gate 验证。
-- 踢人、转让房主等房主管理能力仍需要服务端先补通用 API，而不是客户端绕过
-  SDK 直连后端。
-- 回放和道具需要服务端协议先固定版本，否则客户端只能做预留 UI。
+- 当前客户端已能消费 SDK 和真实 battle push；房间列表、房间详情、房主管理、
+  battle state 查询恢复和回放加载已通过 SDK 和 live gate 验证。
+- 回放播放器当前基于服务端 replay frames JSON，后续如果服务端回放格式升级，
+  需要保持 `tank.replay_frame` adapter 的兼容层。
+- 道具需要服务端协议先固定版本，否则客户端只能保留现有模型和渲染占位。
 
 ## 下一轮跨仓联调建议
 
-1. 客户端增加真实 UI 自动化 gate，覆盖登录、大厅、房间详情、战斗输入和恢复状态断言。
-2. 服务端继续确保 battle snapshot push body 与 `docs/protocol.md` 兼容。
-3. 两仓共同产出 `runtime/validation/tank-client-integration-summary.json`。
+1. 服务端/客户端共同固定道具生成、拾取、buff 状态的 snapshot 字段。
+2. 客户端在现有 `TankSnapshot.items` 基础上接道具渲染、冷却和拾取反馈。
+3. 两仓共同产出包含道具与回放播放断言的 `runtime/validation/tank-client-integration-summary.json`。

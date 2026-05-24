@@ -10,5 +10,5 @@ cmake -S "${REPO_ROOT}" -B "${REPO_ROOT}/build/local" \
   -DBOOST_GATEWAY_SERVER_ROOT="${SERVER_ROOT}" \
   -DBOOST_GATEWAY_SERVER_BUILD_DIR="${SERVER_BUILD_DIR}"
 cmake --build "${REPO_ROOT}/build/local" \
-  --target boost_gateway_tank_client tank_protocol_smoke_test tank_ui_smoke_test tank_headless_gate
+  --target boost_gateway_tank_client tank_protocol_smoke_test tank_ui_smoke_test tank_ui_flow_test tank_headless_gate
 ctest --test-dir "${REPO_ROOT}/build/local" --output-on-failure

@@ -29,6 +29,10 @@ void BattleWidget::applySnapshot(TankSnapshot snapshot) {
     update();
 }
 
+TankSnapshot BattleWidget::currentSnapshot() const {
+    return snapshot_;
+}
+
 void BattleWidget::paintEvent(QPaintEvent*) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);

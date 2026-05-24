@@ -1,5 +1,6 @@
 #include "ui/LoginWindow.h"
 
+#include "core/ClientProfile.h"
 #include "sdk/GatewayClient.h"
 #include "ui/MainWindow.h"
 
@@ -12,7 +13,7 @@
 
 namespace bgtc {
 
-LoginWindow::LoginWindow(AppConfig config, QWidget* parent)
+LoginWindow::LoginWindow(AppConfig config, QString userId, QString token, QWidget* parent)
     : QWidget(parent), config_(std::move(config)) {
     setWindowTitle("BoostGateway Tank Client - 登录");
 
@@ -24,8 +25,14 @@ LoginWindow::LoginWindow(AppConfig config, QWidget* parent)
     auto* form = new QFormLayout();
     hostEdit_ = new QLineEdit(config_.host, this);
     portEdit_ = new QLineEdit(QString::number(config_.port), this);
-    userEdit_ = new QLineEdit(config_.playerPrefix + "_1", this);
-    tokenEdit_ = new QLineEdit("token:" + userEdit_->text(), this);
+    if (userId.isEmpty()) {
+        userId = config_.playerPrefix + "_1";
+    }
+    if (token.isEmpty()) {
+        token = "token:" + userId;
+    }
+    userEdit_ = new QLineEdit(userId, this);
+    tokenEdit_ = new QLineEdit(token, this);
     form->addRow("服务地址", hostEdit_);
     form->addRow("服务端口", portEdit_);
     form->addRow("用户 ID", userEdit_);
@@ -51,6 +58,7 @@ void LoginWindow::handleLogin() {
         return;
     }
 
+    saveClientProfile(ClientProfile{config_, userEdit_->text().trimmed(), tokenEdit_->text()});
     auto* mainWindow = new MainWindow(config_, userEdit_->text(), tokenEdit_->text());
     mainWindow->resize(1100, 720);
     mainWindow->show();
@@ -81,6 +89,7 @@ void LoginWindow::handleRegister() {
         QMessageBox::warning(this, "注册失败", error);
         return;
     }
+    saveClientProfile(ClientProfile{config_, userId, credential});
     setStatus("注册成功，可以直接登录：" + userId);
     QMessageBox::information(this, "注册成功", "账号已注册，可以点击“连接并登录”。");
 }

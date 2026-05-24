@@ -140,16 +140,18 @@
 - P3 已有 heartbeat 启动、disconnect callback、菜单重连入口、重连次数诊断、
   `SessionResumedPush` / `SessionKickedPush` 处理和本地 room/battle 上下文弱恢复；
   room detail 已可用于大厅恢复辅助，battle state 查询已接入重连后的主动 snapshot
-  恢复；`tank_headless_gate` 已覆盖真断线、重连、重新登录和 snapshot 恢复。后续
-  需要补图形界面自动化场景和更细的恢复错误提示。
+  恢复；`tank_headless_gate` 已覆盖真断线、重连、重新登录和 snapshot 恢复。
 - P4 已有排行榜页、结算摘要和回放页；排行榜 top/rank 与回放加载走 SDK，
-  战斗结束后会自动刷新最近一局结算和排行榜，headless gate 会验证 replay load。
+  战斗结束后会自动刷新最近一局结算和排行榜，headless gate 会验证 replay load；
+  回放页已支持播放、暂停、上一帧、下一帧、倍速，并复用战斗渲染。
+- Profile 已落地：应用启动读取本地 profile，登录/注册和设置页会保存 gateway、
+  默认房间、玩家前缀与 token，`BGTC_PROFILE_PATH` 可用于测试隔离。
 - P5 已有道具 snapshot 模型和渲染占位，具体道具协议等待服务端协议稳定。
 - P6 已有构建脚本和 SDK 导入策略，尚未做平台打包。
 - P7 已有诊断页、SDK version、push/snapshot/input/reconnect 计数；已新增
-  `tank_headless_gate`、`tank_ui_smoke_test`、`scripts/run-headless-gate.sh` 和
-  `scripts/run-live-gate.sh`，可覆盖离线 Qt UI smoke 与真实 gateway 双客户端
-  login/room/ready/battle/input/finish/leaderboard 验证。
+  `tank_headless_gate`、`tank_ui_smoke_test`、`tank_ui_flow_test`、
+  `scripts/run-headless-gate.sh` 和 `scripts/run-live-gate.sh`，可覆盖离线 Qt UI
+  smoke、profile/replay UI flow 与真实 gateway 多客户端业务闭环。
 
 ## P1/P2/P7 当前收束结论
 
@@ -165,9 +167,11 @@
   客户端仍保留 `tank.input` JSON 和 `tank.snapshot` JSON 模型，便于后续协议升级。
 - 结算排行榜：客户端可解析 `battle_finished` 的 winner、reason、total_frames 和
   scores，战斗结束后自动切到排行榜页并刷新展示。
-- P3 弱恢复：客户端可识别服务端 resumed/kicked push，重连后恢复本地 room/battle
+- P3 恢复与 profile：客户端可识别服务端 resumed/kicked push，重连后恢复本地 room/battle
   导航上下文，并通过服务端 SDK `battle_state` 查询恢复最新 authoritative snapshot；
-  真断线重连恢复已进入 live gate，后续要把该能力放入图形界面自动化 gate。
+  真断线重连恢复已进入 live gate，本地 profile 已支持启动、登录/注册和设置页持久化。
+- 回放播放：回放已从 JSON 查看器升级为可播放 timeline，能解析服务端 replay frames，
+  并复用战斗画面渲染每一帧。
 - 自动化：`tank_protocol_smoke_test` 覆盖协议解析，`tank_ui_smoke_test` 覆盖离线
-  Qt Widgets 构造和战斗快照渲染，`tank_headless_gate` 覆盖真实 gateway 的注册、
-  房间管理、战斗、重连恢复、回放和排行榜业务闭环。
+  Qt Widgets 构造和战斗快照渲染，`tank_ui_flow_test` 覆盖 profile 与回放播放入口，
+  `tank_headless_gate` 覆盖真实 gateway 的注册、房间管理、战斗、重连恢复、回放和排行榜业务闭环。

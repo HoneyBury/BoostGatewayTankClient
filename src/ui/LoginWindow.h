@@ -14,7 +14,10 @@ class LoginWindow final : public QWidget {
     Q_OBJECT
 
 public:
-    explicit LoginWindow(AppConfig config, QWidget* parent = nullptr);
+    explicit LoginWindow(AppConfig config,
+                         QString userId = {},
+                         QString token = {},
+                         QWidget* parent = nullptr);
 
 private:
     void handleLogin();
