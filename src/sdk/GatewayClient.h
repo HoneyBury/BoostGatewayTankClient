@@ -49,6 +49,16 @@ public:
     bool sendAttackInput(const QString& targetUserId, QString* errorMessage = nullptr);
     bool sendFinishInput(const QString& reason, QString* errorMessage = nullptr);
     bool sendPickupInput(const QString& itemId, QString* errorMessage = nullptr);
+    QString joinMatchmaking(const QString& userId,
+                            qint64 mmr,
+                            const QString& mode,
+                            QString* errorMessage = nullptr);
+    QString leaveMatchmaking(const QString& userId,
+                             const QString& mode,
+                             QString* errorMessage = nullptr);
+    QString queryMatchmakingStatus(const QString& userId,
+                                   const QString& mode,
+                                   QString* errorMessage = nullptr);
     QString queryRoomList(std::size_t page = 1,
                           std::size_t pageSize = 20,
                           const QString& status = {},
@@ -64,6 +74,7 @@ public:
 signals:
     void pushReceived(QString body);
     void battleStartedPush(QString roomId, QString battleId);
+    void matchFoundPush(bgtc::MatchFoundState match);
     void tankSnapshotReceived(bgtc::TankSnapshot snapshot);
     void sessionResumed(QString roomId, bool inBattle);
     void sessionKicked(QString reason);

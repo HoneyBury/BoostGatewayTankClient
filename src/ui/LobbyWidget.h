@@ -6,13 +6,13 @@
 
 #include <QWidget>
 
+class QComboBox;
 class QLabel;
 class QLineEdit;
+class QSpinBox;
+class QTableWidget;
 class QTextEdit;
-class QListWidget;
-class QListWidgetItem;
-class QPushButton;
-class QStackedWidget;
+class QTimer;
 
 namespace bgtc {
 
@@ -21,45 +21,37 @@ class LobbyWidget final : public QWidget {
 
 public:
     LobbyWidget(AppConfig config, ClientSession& session, GatewayClient& gateway, QWidget* parent = nullptr);
+    void refreshRoomList();
 
 signals:
-    void battleStarted(QString battleId);
+    void roomEntered();
     void leaderboardRequested();
-    void returnToBattleRequested();
+    void themeChanged(QString themeName);
+    void matchRoomReceived(QString roomId);
+    void matchmakingRequested();
 
 private:
     void createRoom();
-    void joinRoom();
-    void leaveRoom();
-    void setReady();
-    void unsetReady();
-    void startBattle();
-    void refreshLeaderboard();
-    void refreshRoomList();
-    void refreshRoomDetail();
-    void kickRoomMember();
-    void transferRoomOwner();
-    void appendLog(const QString& text);
-    void refreshRoomSummary();
-    void showLobbyPage();
-    void showRoomPage();
-    void selectRoomFromList(QListWidgetItem* item);
+    void joinRoom(const QString& roomId);
+    void joinMatchmaking();
+    void leaveMatchmaking();
+    void refreshMatchStatus();
     void renderRoomList(const QString& body);
-    void renderRoomDetail(const QString& body);
-    [[nodiscard]] bool requireRoom(const QString& action);
+    void refreshLobbyStateCard(int queueSize = -1);
+    void appendLog(const QString& text);
+    void setRoomCell(int row, int column, const QString& text);
 
     AppConfig config_;
     ClientSession& session_;
     GatewayClient& gateway_;
     QLineEdit* roomEdit_ = nullptr;
-    QLineEdit* adminUserEdit_ = nullptr;
-    QLabel* roomState_ = nullptr;
-    QLabel* capabilityState_ = nullptr;
-    QStackedWidget* pageStack_ = nullptr;
-    QListWidget* roomList_ = nullptr;
-    QListWidget* memberList_ = nullptr;
-    QPushButton* returnBattleButton_ = nullptr;
+    QLabel* lobbyState_ = nullptr;
+    QComboBox* themeBox_ = nullptr;
+    QComboBox* modeBox_ = nullptr;
+    QSpinBox* mmrBox_ = nullptr;
+    QTableWidget* roomTable_ = nullptr;
     QTextEdit* log_ = nullptr;
+    QTimer* refreshTimer_ = nullptr;
 };
 
 }  // namespace bgtc

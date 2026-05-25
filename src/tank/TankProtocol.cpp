@@ -12,8 +12,8 @@ using json = nlohmann::json;
 TankState parseTank(const json& value) {
     TankState tank;
     tank.userId = value.value("user_id", "");
-    tank.x = value.value("x", value.value("pos_x", 0));
-    tank.y = value.value("y", value.value("pos_y", 0));
+    tank.x = value.value("x", value.value("pos_x", 0.0));
+    tank.y = value.value("y", value.value("pos_y", 0.0));
     tank.hp = value.value("hp", 100);
     tank.direction = value.value("direction", 0);
     tank.directionX = value.value("direction_x", value.value("dx", 1));
@@ -37,10 +37,10 @@ BulletState parseBullet(const json& value) {
             bullet.id = std::to_string(value["id"].get<std::int64_t>());
         }
     }
-    bullet.x = value.value("x", 0);
-    bullet.y = value.value("y", 0);
-    bullet.dx = value.value("dx", 0);
-    bullet.dy = value.value("dy", 0);
+    bullet.x = value.value("x", 0.0);
+    bullet.y = value.value("y", 0.0);
+    bullet.dx = value.value("dx", 0.0);
+    bullet.dy = value.value("dy", 0.0);
     bullet.owner = value.value("owner", "");
     return bullet;
 }
@@ -63,8 +63,8 @@ ItemState parseItem(const json& value) {
     ItemState item;
     item.id = value.value("id", "");
     item.type = value.value("type", "");
-    item.x = value.value("x", 0);
-    item.y = value.value("y", 0);
+    item.x = value.value("x", 0.0);
+    item.y = value.value("y", 0.0);
     item.remainingTicks = value.value("remaining_ticks", 0);
     return item;
 }
@@ -319,6 +319,27 @@ std::optional<ReplayTimeline> decodeReplayTimeline(const std::string& payload) {
         return std::nullopt;
     }
     return timeline;
+}
+
+std::optional<MatchFoundState> decodeMatchFoundState(const std::string& payload) {
+    auto doc = json::parse(payload, nullptr, false);
+    if (doc.is_discarded() || !doc.is_object() || !doc.contains("match_id")) {
+        return std::nullopt;
+    }
+
+    MatchFoundState match;
+    match.matchId = doc.value("match_id", "");
+    match.roomId = doc.value("room_id", "");
+    match.mode = doc.value("mode", "1v1");
+    if (doc.contains("players") && doc["players"].is_array()) {
+        for (const auto& player : doc["players"]) {
+            MatchPlayerView item;
+            item.userId = player.value("user_id", "");
+            item.mmr = player.value("mmr", std::int64_t{0});
+            match.players.push_back(std::move(item));
+        }
+    }
+    return match.matchId.empty() ? std::nullopt : std::optional<MatchFoundState>(std::move(match));
 }
 
 TankInput makeMoveInput(std::uint64_t seq, int dx, int dy) {

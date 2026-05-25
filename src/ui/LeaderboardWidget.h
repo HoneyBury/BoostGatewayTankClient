@@ -5,7 +5,8 @@
 
 #include <QWidget>
 
-class QTextEdit;
+class QLabel;
+class QTableWidget;
 
 namespace bgtc {
 
@@ -15,17 +16,20 @@ class LeaderboardWidget final : public QWidget {
 public:
     LeaderboardWidget(ClientSession& session, GatewayClient& gateway, QWidget* parent = nullptr);
     void refreshAfterBattle();
+    void refreshTop();
 
 private:
-    void refreshTop();
     void refreshMine();
-    [[nodiscard]] QString formatLeaderboardJson(const QString& body) const;
+    void renderLeaderboard(const QString& body, bool mineOnly);
+    void setRankCell(int row, int column, const QString& text);
     [[nodiscard]] QString settlementSummary() const;
-    void setOutput(const QString& text);
+    void setStatus(const QString& text);
 
     ClientSession& session_;
     GatewayClient& gateway_;
-    QTextEdit* output_ = nullptr;
+    QLabel* statusLabel_ = nullptr;
+    QLabel* settlementLabel_ = nullptr;
+    QTableWidget* table_ = nullptr;
 };
 
 }  // namespace bgtc

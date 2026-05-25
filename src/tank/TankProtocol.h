@@ -35,6 +35,7 @@ std::string encodeLegacyPickupInput(const std::string& itemId);
 std::optional<TankSnapshot> decodeTankSnapshot(const std::string& payload);
 std::optional<BattleStateEvent> decodeBattleStateEvent(const std::string& payload);
 std::optional<ReplayTimeline> decodeReplayTimeline(const std::string& payload);
+std::optional<MatchFoundState> decodeMatchFoundState(const std::string& payload);
 
 TankInput makeMoveInput(std::uint64_t seq, int dx, int dy);
 TankInput makeFireInput(std::uint64_t seq, int direction);

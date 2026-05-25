@@ -1,0 +1,10 @@
+{
+  "client_version": "@PROJECT_VERSION@",
+  "sdk_version": "@BOOST_GATEWAY_SDK_VERSION@",
+  "gateway_protocol_version": "4.1.0",
+  "tank_protocol_version": "1.0.0",
+  "build_timestamp": "@BGTC_BUILD_TIMESTAMP@",
+  "qt_version": "@BGTC_QT_VERSION@",
+  "platform": "@BGTC_PLATFORM@",
+  "cmake_build_type": "@CMAKE_BUILD_TYPE@"
+}

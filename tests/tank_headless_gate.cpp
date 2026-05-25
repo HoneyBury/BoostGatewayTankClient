@@ -17,6 +17,7 @@ namespace {
 
 struct Step {
     std::string name;
+    std::string category;
     bool passed = false;
     std::string detail;
 };
@@ -26,8 +27,8 @@ struct GateState {
     std::vector<sdk::PushMessage> pushes;
     std::mutex mutex;
 
-    void add_step(std::string name, bool passed, std::string detail = {}) {
-        steps.push_back({std::move(name), passed, std::move(detail)});
+    void add_step(std::string name, bool passed, std::string detail = {}, std::string category = {}) {
+        steps.push_back({std::move(name), std::move(category), passed, std::move(detail)});
     }
 
     [[nodiscard]] bool overall_pass() const {
@@ -86,6 +87,7 @@ void write_summary(const GateState& state,
     for (std::size_t i = 0; i < state.steps.size(); ++i) {
         const auto& step = state.steps[i];
         out << "    {\"name\":\"" << json_escape(step.name)
+            << "\",\"category\":\"" << json_escape(step.category)
             << "\",\"passed\":" << (step.passed ? "true" : "false")
             << ",\"detail\":\"" << json_escape(step.detail) << "\"}";
         if (i + 1 < state.steps.size()) out << ",";
@@ -283,6 +285,67 @@ int main(int argc, char* argv[]) {
 
     const auto leaderboard = alice.leaderboard_top(10, timeout);
     state.add_step("leaderboard_top", leaderboard.ok, leaderboard.response_body);
+
+    // ── Events observation ──────────────────────────────────────────
+    const auto events_state = alice.battle_state(start.battle_id, timeout);
+    const auto events_snapshot = bgtc::decodeTankSnapshot(events_state.response_body);
+    state.add_step("observe_battle_events",
+                   events_state.ok &&
+                       events_snapshot.has_value() &&
+                       !events_snapshot->events.empty(),
+                   events_state.response_body.empty()
+                       ? events_state.error_message
+                       : events_state.response_body);
+
+    // ── Multi-battle continuous play ────────────────────────────────
+    const auto ready_a2 = alice.set_ready(true, timeout);
+    const auto ready_b2 = bob_reconnected.set_ready(true, timeout);
+    state.add_step("multi_battle_ready", ready_a2.ok && ready_b2.ok,
+                   ready_a2.error_message + " | " + ready_b2.error_message);
+
+    const auto start2 = bob_reconnected.start_battle(room_id, timeout);
+    state.add_step("multi_battle_start", start2.ok, start2.error_message);
+    std::this_thread::sleep_for(250ms);
+
+    const auto move_a2 = alice.send_battle_input(bgtc::encodeLegacyMoveInput(70, 70), timeout);
+    const auto move_b2 = bob_reconnected.send_battle_input(bgtc::encodeLegacyMoveInput(30, 30), timeout);
+    state.add_step("multi_battle_inputs", move_a2.ok && move_b2.ok,
+                   move_a2.error_message + " | " + move_b2.error_message);
+    std::this_thread::sleep_for(250ms);
+
+    const auto battle2_state = alice.battle_state(start2.battle_id, timeout);
+    const auto battle2_snapshot = bgtc::decodeTankSnapshot(battle2_state.response_body);
+    state.add_step("multi_battle_state_query",
+                   battle2_state.ok && battle2_snapshot.has_value() &&
+                       battle2_snapshot->frame >= 1 &&
+                       battle2_snapshot->tanks.size() >= 2,
+                   battle2_state.response_body.empty()
+                       ? battle2_state.error_message
+                       : battle2_state.response_body);
+
+    const auto finish2 = alice.send_battle_input(bgtc::encodeLegacyFinishInput("surrender"), timeout);
+    state.add_step("multi_battle_finish", finish2.ok, finish2.error_message);
+    std::this_thread::sleep_for(250ms);
+
+    // ── Matchmaking end-to-end ──────────────────────────────────────
+    const auto match_join_a = alice.match_join(alice_id, 1200, "1v1", timeout);
+    state.add_step("matchmaking_join_alice", match_join_a.ok, match_join_a.error_message);
+
+    const auto match_join_b = bob_reconnected.match_join(bob_id, 1150, "1v1", timeout);
+    state.add_step("matchmaking_join_bob", match_join_b.ok, match_join_b.error_message);
+    std::this_thread::sleep_for(500ms);
+
+    const auto match_status_a = alice.match_status(alice_id, "1v1", timeout);
+    state.add_step("matchmaking_status_query",
+                   match_status_a.ok,
+                   match_status_a.response_body.empty()
+                       ? match_status_a.error_message
+                       : match_status_a.response_body);
+
+    const auto match_leave_a = alice.match_leave(alice_id, "1v1", timeout);
+    const auto match_leave_b = bob_reconnected.match_leave(bob_id, "1v1", timeout);
+    state.add_step("matchmaking_leave", match_leave_a.ok && match_leave_b.ok,
+                   match_leave_a.error_message + " | " + match_leave_b.error_message);
 
     alice.leave_room(room_id, timeout);
     bob_reconnected.leave_room(room_id, timeout);

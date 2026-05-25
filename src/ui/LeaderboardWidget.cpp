@@ -1,12 +1,14 @@
 #include "ui/LeaderboardWidget.h"
 
+#include <QHeaderView>
+#include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
-#include <QTextEdit>
+#include <QTableWidget>
 #include <QVBoxLayout>
 
 namespace bgtc {
@@ -21,13 +23,12 @@ LeaderboardWidget::LeaderboardWidget(ClientSession& session, GatewayClient& gate
     title->setObjectName("PageTitle");
     layout->addWidget(title);
 
-    auto* hint = new QLabel("查看全服 Top 10、我的排名，或在战斗结束后合并显示最近结算。", this);
+    auto* hint = new QLabel("排行榜使用表格展示，不再直接暴露服务端 JSON；战斗结束后会保留最近结算摘要。", this);
     hint->setObjectName("PageHint");
     hint->setWordWrap(true);
     layout->addWidget(hint);
 
     auto* actions = new QHBoxLayout();
-    actions->setSpacing(10);
     auto* topButton = new QPushButton("刷新 Top 10", this);
     auto* mineButton = new QPushButton("查询我的排名", this);
     auto* afterBattleButton = new QPushButton("战斗后刷新", this);
@@ -37,10 +38,24 @@ LeaderboardWidget::LeaderboardWidget(ClientSession& session, GatewayClient& gate
     actions->addStretch(1);
     layout->addLayout(actions);
 
-    output_ = new QTextEdit(this);
-    output_->setReadOnly(true);
-    output_->setPlaceholderText("排行榜结果、最近结算和查询错误会显示在这里。");
-    layout->addWidget(output_, 1);
+    settlementLabel_ = new QLabel(settlementSummary(), this);
+    settlementLabel_->setObjectName("StatePill");
+    settlementLabel_->setWordWrap(true);
+    layout->addWidget(settlementLabel_);
+
+    table_ = new QTableWidget(this);
+    table_->setColumnCount(4);
+    table_->setHorizontalHeaderLabels({"排名", "玩家", "用户 ID", "分数"});
+    table_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    table_->verticalHeader()->setVisible(false);
+    table_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table_->setAlternatingRowColors(true);
+    layout->addWidget(table_, 1);
+
+    statusLabel_ = new QLabel("点击按钮刷新排行榜。", this);
+    statusLabel_->setObjectName("PageHint");
+    layout->addWidget(statusLabel_);
 
     connect(topButton, &QPushButton::clicked, this, &LeaderboardWidget::refreshTop);
     connect(mineButton, &QPushButton::clicked, this, &LeaderboardWidget::refreshMine);
@@ -48,80 +63,81 @@ LeaderboardWidget::LeaderboardWidget(ClientSession& session, GatewayClient& gate
 }
 
 void LeaderboardWidget::refreshAfterBattle() {
-    QString error;
-    const auto top = gateway_.queryLeaderboardTop(10, &error);
-    if (!error.isEmpty()) {
-        setOutput(settlementSummary() + "\n\n刷新排行榜失败：\n" + error);
-        return;
-    }
-    setOutput(settlementSummary() + "\n\n" + formatLeaderboardJson(top));
+    settlementLabel_->setText(settlementSummary());
+    refreshTop();
 }
 
 void LeaderboardWidget::refreshTop() {
     QString error;
     const auto result = gateway_.queryLeaderboardTop(10, &error);
-    setOutput(error.isEmpty() ? formatLeaderboardJson(result) : "查询 Top 10 失败：\n" + error);
+    if (!error.isEmpty()) {
+        setStatus("查询 Top 10 失败：" + error);
+        QMessageBox::warning(this, "排行榜查询失败", error);
+        return;
+    }
+    renderLeaderboard(result, false);
 }
 
 void LeaderboardWidget::refreshMine() {
     QString error;
     const auto result = gateway_.queryLeaderboardRank(session_.userId, &error);
-    setOutput(error.isEmpty() ? formatLeaderboardJson(result) : "查询我的排名失败：\n" + error);
+    if (!error.isEmpty()) {
+        setStatus("查询我的排名失败：" + error);
+        QMessageBox::warning(this, "排行榜查询失败", error);
+        return;
+    }
+    renderLeaderboard(result, true);
 }
 
-QString LeaderboardWidget::formatLeaderboardJson(const QString& body) const {
+void LeaderboardWidget::renderLeaderboard(const QString& body, bool mineOnly) {
     const auto doc = QJsonDocument::fromJson(body.toUtf8());
-    if (doc.isNull() || !doc.isObject()) {
-        return body;
+    if (!doc.isObject()) {
+        setStatus("排行榜返回无法解析。");
+        QMessageBox::warning(this, "排行榜返回异常", "排行榜返回无法解析。");
+        return;
     }
 
+    table_->setRowCount(0);
     const auto root = doc.object();
-    QStringList lines;
-    lines << "排行榜 Top 10";
-    lines << "----------------";
-    if (root.contains("status")) {
-        lines << "状态：" + root.value("status").toString();
-        lines << "";
+    if (mineOnly || root.contains("rank")) {
+        table_->setRowCount(1);
+        setRankCell(0, 0, QString::number(root.value("rank").toInt()));
+        setRankCell(0, 1, root.value("display_name").toString(root.value("user_id").toString(session_.userId)));
+        setRankCell(0, 2, root.value("user_id").toString(session_.userId));
+        setRankCell(0, 3, QString::number(root.value("score").toInt()));
+        setStatus("我的排名已刷新。");
+        return;
     }
-    if (root.contains("entries") && root.value("entries").isArray()) {
-        const auto entries = root.value("entries").toArray();
-        for (const auto& item : entries) {
-            const auto entry = item.toObject();
-            lines << QString("#%1  %2    分数 %3")
-                         .arg(entry.value("rank").toInt())
-                         .arg(entry.value("display_name").toString(entry.value("user_id").toString()))
-                         .arg(entry.value("score").toInt());
-        }
-        if (entries.isEmpty()) {
-            lines << "暂无排行榜数据";
-        }
-    } else if (root.contains("rank")) {
-        lines << "我的排名";
-        lines << "----------------";
-        lines << QString("#%1  %2    分数 %3")
-                     .arg(root.value("rank").toInt())
-                     .arg(root.value("display_name").toString(root.value("user_id").toString(session_.userId)))
-                     .arg(root.value("score").toInt());
-    } else {
-        lines << QString::fromUtf8(doc.toJson(QJsonDocument::Indented));
+
+    const auto entries = root.value("entries").toArray();
+    table_->setRowCount(entries.size());
+    for (int row = 0; row < entries.size(); ++row) {
+        const auto entry = entries.at(row).toObject();
+        setRankCell(row, 0, QString::number(entry.value("rank").toInt(row + 1)));
+        setRankCell(row, 1, entry.value("display_name").toString(entry.value("user_id").toString()));
+        setRankCell(row, 2, entry.value("user_id").toString());
+        setRankCell(row, 3, QString::number(entry.value("score").toInt()));
     }
-    return lines.join('\n');
+    setStatus(entries.isEmpty() ? "暂无排行榜数据。" : "Top 10 已刷新。");
+}
+
+void LeaderboardWidget::setRankCell(int row, int column, const QString& text) {
+    auto* item = new QTableWidgetItem(text);
+    item->setTextAlignment(Qt::AlignCenter);
+    table_->setItem(row, column, item);
 }
 
 QString LeaderboardWidget::settlementSummary() const {
-    QStringList lines;
-    lines << "最近一局结算";
-    lines << "----------------";
-    lines << "Battle：" + (session_.battleId.isEmpty() ? "未知" : session_.battleId);
-    lines << "胜者：" + (session_.lastWinnerUserId.isEmpty() ? "未知" : session_.lastWinnerUserId);
-    lines << "原因：" + (session_.lastFinishReason.isEmpty() ? "unknown" : session_.lastFinishReason);
-    lines << QString("总帧数：%1").arg(session_.lastBattleFrames);
-    lines << QString("我的分数：%1").arg(session_.lastBattleScore);
-    return lines.join('\n');
+    return QString("最近一局：Battle=%1    胜者=%2    原因=%3    总帧数=%4    我的分数=%5")
+        .arg(session_.battleId.isEmpty() ? "未知" : session_.battleId,
+             session_.lastWinnerUserId.isEmpty() ? "未知" : session_.lastWinnerUserId,
+             session_.lastFinishReason.isEmpty() ? "unknown" : session_.lastFinishReason)
+        .arg(session_.lastBattleFrames)
+        .arg(session_.lastBattleScore);
 }
 
-void LeaderboardWidget::setOutput(const QString& text) {
-    output_->setPlainText(text);
+void LeaderboardWidget::setStatus(const QString& text) {
+    statusLabel_->setText(text);
 }
 
 }  // namespace bgtc

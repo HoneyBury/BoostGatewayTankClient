@@ -21,11 +21,17 @@ struct ClientSession {
     QString displayName;
     QString roomId;
     QString battleId;
+    QString matchId;
+    QString matchMode = "1v1";
+    QString lastMatchNote;
     QString lastWinnerUserId;
     QString lastFinishReason;
     int lastBattleFrames = 0;
     int lastBattleScore = 0;
+    qint64 matchmakingMmr = 1200;
+    qint64 matchmakingQueuedAtMs = 0;
     bool ready = false;
+    bool matchmakingQueued = false;
     ConnectionState state = ConnectionState::Disconnected;
 };
 

@@ -6,6 +6,7 @@ cmake-build-*/
 *.autosave
 *.log
 *.tmp
+tank-client-headless-summary.json
 
 # Runtime artifacts
 runtime/

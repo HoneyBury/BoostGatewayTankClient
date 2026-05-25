@@ -391,7 +391,76 @@ QString GatewayClient::unsupportedFeatureMessage(const QString& feature) const {
 }
 
 QString GatewayClient::formatError(std::int32_t code, const std::string& message) {
-    return QString("code=%1 message=%2").arg(code).arg(QString::fromStdString(message));
+    const auto raw = QString::fromStdString(message);
+    const auto normalized = raw.trimmed();
+    const auto translated = [&]() -> QString {
+        if (normalized.contains("connect failed")) return "连接网关失败，请确认地址、端口和后端服务状态。";
+        if (normalized.contains("login failed")) return "登录失败，请检查账号或令牌。";
+        if (normalized.contains("register failed")) return "注册失败，请检查账号信息或后端注册服务。";
+        if (normalized.contains("create room failed")) return "创建房间失败，请确认房间号是否可用。";
+        if (normalized.contains("join room failed")) return "加入房间失败，请确认房间存在且可加入。";
+        if (normalized.contains("leave room failed")) return "离开房间失败，请稍后重试。";
+        if (normalized.contains("room kick failed")) return "踢出成员失败，可能不是房主或目标玩家已离开。";
+        if (normalized.contains("room owner transfer failed")) return "转让房主失败，请确认目标成员仍在房间内。";
+        if (normalized.contains("ready failed")) return "设置准备状态失败，请确认当前仍在房间内。";
+        if (normalized.contains("start battle failed")) return "开始战斗失败，请确认所有成员都已准备。";
+        if (normalized.contains("battle state failed")) return "同步战斗状态失败，请检查战斗是否已创建。";
+        if (normalized.contains("room_not_found")) return "未找到对应房间。";
+        if (normalized.contains("battle_not_found")) return "未找到对应战斗。";
+        if (normalized.contains("not_room_owner")) return "只有房主才能执行这个操作。";
+        if (normalized.contains("not_all_ready")) return "还有成员未准备，暂时不能开始战斗。";
+        if (normalized.contains("matchmaking_backend_unavailable")) return "匹配服务暂时不可用，请稍后重试。";
+        if (normalized.contains("invalid_match_join")) return "匹配请求无效，请检查模式和分数。";
+        if (normalized.contains("session kicked")) return "当前会话已被替换，请重新登录。";
+        if (normalized.isEmpty()) return "请求失败。";
+        return normalized;
+    }();
+    return QString("错误码 %1：%2").arg(code).arg(translated);
+}
+
+QString GatewayClient::joinMatchmaking(const QString& userId,
+                                       qint64 mmr,
+                                       const QString& mode,
+                                       QString* errorMessage) {
+    const auto result = client_->match_join(toStdString(userId), mmr, toStdString(mode), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "match join failed");
+        return {};
+    }
+    recordEvent("joined matchmaking: " + mode);
+    return QString::fromStdString(result.response_body);
+}
+
+QString GatewayClient::leaveMatchmaking(const QString& userId,
+                                        const QString& mode,
+                                        QString* errorMessage) {
+    const auto result = client_->match_leave(toStdString(userId), toStdString(mode), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "match leave failed");
+        return {};
+    }
+    recordEvent("left matchmaking: " + mode);
+    return QString::fromStdString(result.response_body);
+}
+
+QString GatewayClient::queryMatchmakingStatus(const QString& userId,
+                                              const QString& mode,
+                                              QString* errorMessage) {
+    const auto result = client_->match_status(toStdString(userId), toStdString(mode), kDefaultTimeout);
+    if (!result.ok) {
+        if (errorMessage) {
+            *errorMessage = formatError(result.error_code, result.error_message);
+        }
+        recordError(errorMessage ? *errorMessage : "match status failed");
+        return {};
+    }
+    return QString::fromStdString(result.response_body);
 }
 
 void GatewayClient::installCallbacks() {
@@ -415,6 +484,9 @@ void GatewayClient::installCallbacks() {
                 !battleState->battleId.empty()) {
                 emit battleStartedPush(QString::fromStdString(battleState->roomId),
                                        QString::fromStdString(battleState->battleId));
+            }
+            if (auto match = decodeMatchFoundState(body.toStdString())) {
+                emit matchFoundPush(*match);
             }
             if (auto snapshot = decodeTankSnapshot(body.toStdString())) {
                 ++diagnostics_.snapshotsReceived;

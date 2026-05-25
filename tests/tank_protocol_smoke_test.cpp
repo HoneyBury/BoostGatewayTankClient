@@ -59,6 +59,31 @@ int main() {
     assert(itemFrame->buffs[0].remainingTicks == 90);
     assert(bgtc::encodeLegacyPickupInput("boost_battle_1") == "pickup:boost_battle_1");
 
+    // decodeMatchFoundState
+    const auto matchFound = bgtc::decodeMatchFoundState(
+        R"({"match_id":"m1","room_id":"r1","mode":"2v2","players":[{"user_id":"alice","mmr":1200},{"user_id":"bob","mmr":1150}]})");
+    assert(matchFound.has_value());
+    assert(matchFound->matchId == "m1");
+    assert(matchFound->roomId == "r1");
+    assert(matchFound->mode == "2v2");
+    assert(matchFound->players.size() == 2);
+    assert(matchFound->players[0].userId == "alice");
+    assert(matchFound->players[0].mmr == 1200);
+
+    // Multi-event snapshot
+    const auto multiEvent = bgtc::decodeTankSnapshot(
+        R"({"battle_id":"battle_1","frame_number":5,"kind":"frame_advanced","participants":[{"user_id":"alice","pos_x":50,"pos_y":50}],"events":[{"type":"hit","actor":"alice","target":"bob","damage":25},{"type":"kill","actor":"alice","target":"bob"},{"type":"item_pickup","actor":"alice","item_id":"it1","item_type":"shield","buff_type":"shield","remaining_ticks":120},{"type":"heal","actor":"alice","damage":15}],"buffs":[{"user_id":"alice","type":"shield","remaining_ticks":120}]})");
+    assert(multiEvent.has_value());
+    assert(multiEvent->events.size() == 4);
+    assert(multiEvent->events[0].type == "hit");
+    assert(multiEvent->events[0].damage == 25);
+    assert(multiEvent->events[1].type == "kill");
+    assert(multiEvent->events[2].type == "item_pickup");
+    assert(multiEvent->events[2].buffType == "shield");
+    assert(multiEvent->events[3].type == "heal");
+    assert(multiEvent->buffs.size() == 1);
+    assert(multiEvent->buffs[0].type == "shield");
+
     std::cout << "tank protocol smoke test passed\n";
     return 0;
 }
