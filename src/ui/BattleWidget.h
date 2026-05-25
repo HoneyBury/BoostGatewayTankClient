@@ -5,6 +5,7 @@
 #include "tank/TankWorldModel.h"
 
 #include <QWidget>
+#include <unordered_map>
 
 class QKeyEvent;
 class QPainter;
@@ -58,6 +59,8 @@ private:
     int activeDy_ = 0;
     int facingDx_ = 1;
     int facingDy_ = 0;
+    std::unordered_map<std::string, int> lastHpByUser_;
+    std::unordered_map<std::string, int> hitFlashByUser_;
     bool keyUp_ = false;
     bool keyDown_ = false;
     bool keyLeft_ = false;

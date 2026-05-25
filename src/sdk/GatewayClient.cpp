@@ -410,6 +410,12 @@ void GatewayClient::installCallbacks() {
                 recordError("session kicked: " + body);
                 emit sessionKicked(body);
             }
+            if (auto battleState = decodeBattleStateEvent(body.toStdString());
+                battleState.has_value() && battleState->kind == "started" &&
+                !battleState->battleId.empty()) {
+                emit battleStartedPush(QString::fromStdString(battleState->roomId),
+                                       QString::fromStdString(battleState->battleId));
+            }
             if (auto snapshot = decodeTankSnapshot(body.toStdString())) {
                 ++diagnostics_.snapshotsReceived;
                 diagnostics_.latestFrame = snapshot->frame;

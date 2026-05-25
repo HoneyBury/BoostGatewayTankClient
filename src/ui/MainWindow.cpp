@@ -154,9 +154,18 @@ MainWindow::MainWindow(AppConfig config, QString userId, QString token, QWidget*
     connect(diagnosticsButton, &QPushButton::clicked, this, [this]() { showPage(4); });
     connect(settingsButton, &QPushButton::clicked, this, [this]() { showPage(5); });
     connect(lobby_, &LobbyWidget::battleStarted, this, [this](const QString& battleId) {
-        session_.battleId = battleId;
-        session_.state = ConnectionState::InBattle;
-        showLoadingThenBattle(battleId);
+        enterBattle(battleId);
+    });
+    connect(lobby_, &LobbyWidget::returnToBattleRequested, this, [this]() {
+        if (!session_.battleId.isEmpty()) {
+            showBattle();
+        }
+    });
+    connect(&gateway_, &GatewayClient::battleStartedPush, this, [this](const QString& roomId, const QString& battleId) {
+        if (!roomId.isEmpty()) {
+            session_.roomId = roomId;
+        }
+        enterBattle(battleId);
     });
     connect(&gateway_, &GatewayClient::tankSnapshotReceived, battle_, &BattleWidget::applySnapshot);
     connect(&gateway_, &GatewayClient::tankSnapshotReceived, this, &MainWindow::handleTankSnapshot);
@@ -249,6 +258,19 @@ void MainWindow::showBattle() {
     showPage(1);
     battle_->setFocus(Qt::OtherFocusReason);
     setStatus("已进入战斗：" + (session_.battleId.isEmpty() ? "等待 battle id" : session_.battleId));
+}
+
+void MainWindow::enterBattle(const QString& battleId) {
+    if (battleId.isEmpty()) {
+        return;
+    }
+    if (session_.battleId == battleId && session_.state == ConnectionState::InBattle &&
+        stack_->currentIndex() == 1) {
+        return;
+    }
+    session_.battleId = battleId;
+    session_.state = ConnectionState::InBattle;
+    showLoadingThenBattle(battleId);
 }
 
 void MainWindow::showLoadingThenBattle(const QString& battleId) {

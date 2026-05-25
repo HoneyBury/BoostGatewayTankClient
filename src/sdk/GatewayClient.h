@@ -63,6 +63,7 @@ public:
 
 signals:
     void pushReceived(QString body);
+    void battleStartedPush(QString roomId, QString battleId);
     void tankSnapshotReceived(bgtc::TankSnapshot snapshot);
     void sessionResumed(QString roomId, bool inBattle);
     void sessionKicked(QString reason);

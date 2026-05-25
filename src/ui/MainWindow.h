@@ -34,6 +34,7 @@ private:
     void showLobby();
     void showBattle();
     void showLoadingThenBattle(const QString& battleId);
+    void enterBattle(const QString& battleId);
     void handleTankSnapshot(const bgtc::TankSnapshot& snapshot);
     bool restoreBattleSnapshot();
     QString activeBattleIdFromRoomDetail(const QString& roomId);

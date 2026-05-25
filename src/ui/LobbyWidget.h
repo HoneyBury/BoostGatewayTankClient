@@ -11,6 +11,8 @@ class QLineEdit;
 class QTextEdit;
 class QListWidget;
 class QListWidgetItem;
+class QPushButton;
+class QStackedWidget;
 
 namespace bgtc {
 
@@ -23,6 +25,7 @@ public:
 signals:
     void battleStarted(QString battleId);
     void leaderboardRequested();
+    void returnToBattleRequested();
 
 private:
     void createRoom();
@@ -38,8 +41,11 @@ private:
     void transferRoomOwner();
     void appendLog(const QString& text);
     void refreshRoomSummary();
+    void showLobbyPage();
+    void showRoomPage();
     void selectRoomFromList(QListWidgetItem* item);
     void renderRoomList(const QString& body);
+    void renderRoomDetail(const QString& body);
     [[nodiscard]] bool requireRoom(const QString& action);
 
     AppConfig config_;
@@ -49,7 +55,10 @@ private:
     QLineEdit* adminUserEdit_ = nullptr;
     QLabel* roomState_ = nullptr;
     QLabel* capabilityState_ = nullptr;
+    QStackedWidget* pageStack_ = nullptr;
     QListWidget* roomList_ = nullptr;
+    QListWidget* memberList_ = nullptr;
+    QPushButton* returnBattleButton_ = nullptr;
     QTextEdit* log_ = nullptr;
 };
 

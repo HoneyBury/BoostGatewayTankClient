@@ -12,6 +12,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QStackedWidget>
 #include <QTextEdit>
 #include <QVBoxLayout>
 
@@ -27,7 +28,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     title->setObjectName("PageTitle");
     layout->addWidget(title);
 
-    auto* hint = new QLabel("输入房间 ID 后创建或加入房间；准备后由房主开始战斗。", this);
+    auto* hint = new QLabel("大厅查看房间，创建或加入后进入房间页；准备后由房主开始战斗。", this);
     hint->setObjectName("PageHint");
     hint->setWordWrap(true);
     layout->addWidget(hint);
@@ -36,9 +37,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     roomState_->setObjectName("StatePill");
     layout->addWidget(roomState_);
 
-    capabilityState_ = new QLabel(
-        "当前可用：创建、加入、离开、准备、开始战斗、房间列表、房间详情、踢出成员、转让房主。",
-        this);
+    capabilityState_ = new QLabel("当前可用：大厅列表、右键加入、房间成员列表、准备/开始/返回战斗。", this);
     capabilityState_->setObjectName("PageHint");
     capabilityState_->setWordWrap(true);
     layout->addWidget(capabilityState_);
@@ -65,26 +64,54 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     auto* kickButton = new QPushButton("踢出成员", this);
     auto* transferButton = new QPushButton("转让房主", this);
     auto* leaderboardButton = new QPushButton("排行榜", this);
+    auto* lobbyPageButton = new QPushButton("返回大厅", this);
+    returnBattleButton_ = new QPushButton("返回战斗", this);
 
-    row->addWidget(createButton, 0, 0);
-    row->addWidget(joinButton, 0, 1);
-    row->addWidget(readyButton, 0, 2);
-    row->addWidget(startButton, 0, 3);
-    row->addWidget(unreadyButton, 1, 0);
-    row->addWidget(leaveButton, 1, 1);
-    row->addWidget(listButton, 1, 2);
-    row->addWidget(detailButton, 1, 3);
-    row->addWidget(kickButton, 1, 4);
-    row->addWidget(transferButton, 1, 5);
-    row->addWidget(leaderboardButton, 1, 6);
+    row->addWidget(listButton, 0, 0);
+    row->addWidget(createButton, 0, 1);
+    row->addWidget(joinButton, 0, 2);
+    row->addWidget(lobbyPageButton, 0, 3);
+    row->addWidget(detailButton, 1, 0);
+    row->addWidget(readyButton, 1, 1);
+    row->addWidget(unreadyButton, 1, 2);
+    row->addWidget(startButton, 1, 3);
+    row->addWidget(leaveButton, 1, 4);
+    row->addWidget(returnBattleButton_, 1, 5);
+    row->addWidget(kickButton, 2, 0);
+    row->addWidget(transferButton, 2, 1);
+    row->addWidget(leaderboardButton, 2, 2);
     row->setColumnStretch(4, 1);
     layout->addLayout(row);
 
+    pageStack_ = new QStackedWidget(this);
+
+    auto* lobbyPage = new QWidget(this);
+    auto* lobbyLayout = new QVBoxLayout(lobbyPage);
+    lobbyLayout->setContentsMargins(0, 0, 0, 0);
+    auto* lobbyHint = new QLabel("大厅房间列表：显示房主、人数、准备人数、是否战斗中；右键房间可以加入。", lobbyPage);
+    lobbyHint->setObjectName("PageHint");
+    lobbyHint->setWordWrap(true);
+    lobbyLayout->addWidget(lobbyHint);
     roomList_ = new QListWidget(this);
     roomList_->setContextMenuPolicy(Qt::CustomContextMenu);
     roomList_->addItem("点击“刷新房间列表”从 gateway 查询真实房间。");
     roomList_->addItem("选中房间后会自动填入 room_id，可直接加入或查看详情。");
-    layout->addWidget(roomList_);
+    lobbyLayout->addWidget(roomList_);
+
+    auto* roomPage = new QWidget(this);
+    auto* roomLayout = new QVBoxLayout(roomPage);
+    roomLayout->setContentsMargins(0, 0, 0, 0);
+    auto* roomHint = new QLabel("房间成员列表：房主、准备状态和战斗状态会展示在这里。", roomPage);
+    roomHint->setObjectName("PageHint");
+    roomHint->setWordWrap(true);
+    roomLayout->addWidget(roomHint);
+    memberList_ = new QListWidget(roomPage);
+    memberList_->addItem("创建或加入房间后显示成员。");
+    roomLayout->addWidget(memberList_);
+
+    pageStack_->addWidget(lobbyPage);
+    pageStack_->addWidget(roomPage);
+    layout->addWidget(pageStack_);
 
     log_ = new QTextEdit(this);
     log_->setReadOnly(true);
@@ -92,6 +119,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     layout->addWidget(log_);
 
     connect(listButton, &QPushButton::clicked, this, &LobbyWidget::refreshRoomList);
+    connect(lobbyPageButton, &QPushButton::clicked, this, &LobbyWidget::showLobbyPage);
     connect(detailButton, &QPushButton::clicked, this, &LobbyWidget::refreshRoomDetail);
     connect(createButton, &QPushButton::clicked, this, &LobbyWidget::createRoom);
     connect(joinButton, &QPushButton::clicked, this, &LobbyWidget::joinRoom);
@@ -102,6 +130,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
     connect(kickButton, &QPushButton::clicked, this, &LobbyWidget::kickRoomMember);
     connect(transferButton, &QPushButton::clicked, this, &LobbyWidget::transferRoomOwner);
     connect(leaderboardButton, &QPushButton::clicked, this, &LobbyWidget::refreshLeaderboard);
+    connect(returnBattleButton_, &QPushButton::clicked, this, &LobbyWidget::returnToBattleRequested);
     connect(roomList_, &QListWidget::itemClicked, this, &LobbyWidget::selectRoomFromList);
     connect(roomList_, &QListWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
         auto* item = roomList_->itemAt(pos);
@@ -117,6 +146,7 @@ LobbyWidget::LobbyWidget(AppConfig config, ClientSession& session, GatewayClient
         }
     });
     connect(&gateway_, &GatewayClient::pushReceived, this, &LobbyWidget::appendLog);
+    showLobbyPage();
 }
 
 void LobbyWidget::createRoom() {
@@ -126,6 +156,7 @@ void LobbyWidget::createRoom() {
         session_.roomId = roomId;
         session_.state = ConnectionState::InRoom;
         refreshRoomSummary();
+        showRoomPage();
         appendLog("创建房间成功：" + roomId + "，请点击“准备”。");
     } else {
         appendLog("创建房间失败：" + error);
@@ -140,6 +171,7 @@ void LobbyWidget::joinRoom() {
         session_.roomId = roomId;
         session_.state = ConnectionState::InRoom;
         refreshRoomSummary();
+        showRoomPage();
         appendLog("加入房间成功：" + roomId + "，请确认准备状态。");
     } else {
         appendLog("加入房间失败：" + error);
@@ -158,6 +190,7 @@ void LobbyWidget::leaveRoom() {
         session_.ready = false;
         session_.state = ConnectionState::InLobby;
         refreshRoomSummary();
+        showLobbyPage();
     } else {
         appendLog("离开房间失败：" + error);
         QMessageBox::warning(this, "离开房间失败", error);
@@ -237,7 +270,12 @@ void LobbyWidget::refreshRoomDetail() {
     }
     QString error;
     const auto body = gateway_.queryRoomDetail(roomId, &error);
-    appendLog(error.isEmpty() ? "房间详情：" + body : "查询房间详情失败：" + error);
+    if (error.isEmpty()) {
+        appendLog("房间详情：" + body);
+        renderRoomDetail(body);
+    } else {
+        appendLog("查询房间详情失败：" + error);
+    }
 }
 
 void LobbyWidget::kickRoomMember() {
@@ -283,12 +321,37 @@ void LobbyWidget::appendLog(const QString& text) {
 void LobbyWidget::refreshRoomSummary() {
     if (session_.roomId.isEmpty()) {
         roomState_->setText("大厅：尚未进入房间");
+        if (memberList_ != nullptr) {
+            memberList_->clear();
+            memberList_->addItem("创建或加入房间后显示成员。");
+        }
+        if (returnBattleButton_ != nullptr) {
+            returnBattleButton_->setEnabled(false);
+        }
         return;
     }
     const auto readyText = session_.ready ? "已准备" : "未准备";
     const auto battleText = session_.battleId.isEmpty() ? "未开始战斗" : "战斗：" + session_.battleId;
     roomState_->setText(QString("当前房间：%1    状态：%2    %3")
                             .arg(session_.roomId, readyText, battleText));
+    if (returnBattleButton_ != nullptr) {
+        returnBattleButton_->setEnabled(!session_.battleId.isEmpty());
+    }
+    refreshRoomDetail();
+}
+
+void LobbyWidget::showLobbyPage() {
+    if (pageStack_ != nullptr) {
+        pageStack_->setCurrentIndex(0);
+    }
+    refreshRoomList();
+}
+
+void LobbyWidget::showRoomPage() {
+    if (pageStack_ != nullptr) {
+        pageStack_->setCurrentIndex(1);
+    }
+    refreshRoomDetail();
 }
 
 void LobbyWidget::selectRoomFromList(QListWidgetItem* item) {
@@ -322,11 +385,62 @@ void LobbyWidget::renderRoomList(const QString& body) {
         const auto roomId = room.value("room_id").toString(room.value("id").toString());
         const auto owner = room.value("owner_user_id").toString(room.value("owner").toString("unknown"));
         const auto status = room.value("status").toString("unknown");
-        const auto members = room.value("members").toArray().size();
+        const auto membersArray = room.value("members").toArray();
+        const auto members = membersArray.size();
+        int readyCount = 0;
+        for (const auto& memberValue : membersArray) {
+            if (memberValue.toObject().value("ready").toBool(false)) {
+                ++readyCount;
+            }
+        }
+        const auto activeBattle = room.value("active_battle_id").toString();
+        const auto battleText = activeBattle.isEmpty() ? "等待中" : "战斗中 " + activeBattle;
         auto* item = new QListWidgetItem(
-            QString("%1 | %2人 | owner=%3 | %4").arg(roomId).arg(members).arg(owner, status),
+            QString("%1 | %2人 | 已准备%3 | owner=%4 | %5 | %6")
+                .arg(roomId)
+                .arg(members)
+                .arg(readyCount)
+                .arg(owner, status, battleText),
             roomList_);
         item->setData(Qt::UserRole, roomId);
+    }
+}
+
+void LobbyWidget::renderRoomDetail(const QString& body) {
+    if (memberList_ == nullptr) {
+        return;
+    }
+    memberList_->clear();
+    const auto doc = QJsonDocument::fromJson(body.toUtf8());
+    if (!doc.isObject()) {
+        memberList_->addItem("房间详情无法解析。");
+        return;
+    }
+    const auto room = doc.object().value("room").toObject();
+    const auto owner = room.value("owner_user_id").toString();
+    const auto status = room.value("status").toString("unknown");
+    const auto activeBattle = room.value("active_battle_id").toString();
+    session_.battleId = activeBattle;
+    roomState_->setText(QString("当前房间：%1    房主：%2    %3    %4")
+                            .arg(room.value("room_id").toString(session_.roomId),
+                                 owner,
+                                 status,
+                                 activeBattle.isEmpty() ? "未开始战斗" : "战斗：" + activeBattle));
+    if (returnBattleButton_ != nullptr) {
+        returnBattleButton_->setEnabled(!session_.battleId.isEmpty());
+    }
+    const auto members = room.value("members").toArray();
+    if (members.isEmpty()) {
+        memberList_->addItem("房间暂无成员。");
+        return;
+    }
+    for (const auto& value : members) {
+        const auto member = value.toObject();
+        const auto userId = member.value("user_id").toString();
+        const auto ready = member.value("ready").toBool(false);
+        const auto role = userId == owner ? "房主" : "成员";
+        memberList_->addItem(QString("%1 | %2 | %3")
+                                 .arg(userId, role, ready ? "已准备" : "未准备"));
     }
 }
 

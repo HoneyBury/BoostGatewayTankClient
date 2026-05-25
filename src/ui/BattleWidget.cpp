@@ -81,6 +81,19 @@ BattleWidget::BattleWidget(ClientSession& session, GatewayClient& gateway, QWidg
 }
 
 void BattleWidget::applySnapshot(TankSnapshot snapshot) {
+    for (const auto& tank : snapshot.tanks) {
+        const auto last = lastHpByUser_.find(tank.userId);
+        if (last != lastHpByUser_.end() && tank.hp < last->second) {
+            hitFlashByUser_[tank.userId] = 6;
+        }
+        lastHpByUser_[tank.userId] = tank.hp;
+    }
+    for (auto& [userId, ticks] : hitFlashByUser_) {
+        (void)userId;
+        if (ticks > 0) {
+            --ticks;
+        }
+    }
     snapshot_ = std::move(snapshot);
     if (const auto* localTank = findLocalTank()) {
         const auto grid = tankToGrid(*localTank);
@@ -467,9 +480,18 @@ void BattleWidget::drawTank(QPainter& painter, const QRect& mapRect, const TankS
     const auto screen = tankToScreen(tank);
     const bool isLocal = tank.userId == session_.userId.toStdString();
     const QRect rect(mapRect.left() + screen.x(), mapRect.top() + screen.y(), kCell, kCell);
-    const QColor body = isLocal ? QColor("#26d9a1") : QColor("#ff5c7a");
-    const QColor accent = isLocal ? QColor("#b8ffe9") : QColor("#ffd2dc");
+    const auto flashIt = hitFlashByUser_.find(tank.userId);
+    const bool flashing = flashIt != hitFlashByUser_.end() && flashIt->second > 0;
+    const QColor body = flashing ? QColor("#ff2d2d") : (isLocal ? QColor("#26d9a1") : QColor("#ff5c7a"));
+    const QColor accent = flashing ? QColor("#fff1f1") : (isLocal ? QColor("#b8ffe9") : QColor("#ffd2dc"));
     drawTankBody(painter, rect, body, accent);
+    if (flashing) {
+        painter.save();
+        painter.setPen(QPen(QColor(255, 60, 60, 190), 3));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawEllipse(rect.center(), 20, 20);
+        painter.restore();
+    }
 
     const QPoint center = rect.center();
     const int dirX = tank.directionX == 0 && tank.directionY == 0 ? 1 : tank.directionX;
