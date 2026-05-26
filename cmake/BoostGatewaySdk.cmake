@@ -3,6 +3,14 @@ set(BOOST_GATEWAY_SERVER_BUILD_DIR "" CACHE PATH "Path to the BoostGateway serve
 set(BOOST_GATEWAY_SDK_DIR "" CACHE PATH "Path to a directory containing boost_gateway_sdk-config.cmake")
 
 set(_bgtc_sdk_found OFF)
+set(_bgtc_client_third_party_sdk_dir "${CMAKE_CURRENT_LIST_DIR}/../third_party/sdk-package/lib/cmake/boost_gateway_sdk")
+
+if(NOT BOOST_GATEWAY_SDK_DIR
+   AND EXISTS "${_bgtc_client_third_party_sdk_dir}/boost_gateway_sdk-config.cmake"
+   AND EXISTS "${_bgtc_client_third_party_sdk_dir}/boost_gateway_sdk-targets.cmake")
+    set(BOOST_GATEWAY_SDK_DIR "${_bgtc_client_third_party_sdk_dir}" CACHE PATH
+        "Path to a directory containing boost_gateway_sdk-config.cmake" FORCE)
+endif()
 
 if(BOOST_GATEWAY_SDK_DIR
    AND EXISTS "${BOOST_GATEWAY_SDK_DIR}/boost_gateway_sdk-config.cmake"
@@ -22,6 +30,7 @@ if(NOT _bgtc_sdk_found AND BOOST_GATEWAY_SERVER_ROOT)
         "${BOOST_GATEWAY_SERVER_ROOT}/build/release/sdk"
         "${BOOST_GATEWAY_SERVER_ROOT}/build/default/sdk"
         "${BOOST_GATEWAY_SERVER_ROOT}/runtime/sdk-package-prefix"
+        "${BOOST_GATEWAY_SERVER_ROOT}/runtime/sdk-package-prefix/lib/cmake/boost_gateway_sdk"
     )
 
     foreach(_candidate

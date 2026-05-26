@@ -38,6 +38,7 @@ assets/       后续美术、音效、地图和 Qt resource
 
 客户端使用 CMake + Qt Widgets。优先使用 Qt 6，也兼容 Qt 5。
 完整部署、运行和打包说明见 [docs/client-deployment.md](docs/client-deployment.md)。
+第三方资产与 SDK package 管理见 [docs/third-party-assets.md](docs/third-party-assets.md)。
 
 推荐开发方式是在同级目录保留服务端仓库：
 
@@ -120,6 +121,7 @@ docker compose -f env/docker/docker-compose.yml up -d
 - 正式发布阶段应使用安装后的 SDK prefix 或 SDK release artifact。
 
 详见 [docs/server-integration.md](docs/server-integration.md)。
+第三方资产与新机器依赖恢复见 [docs/third-party-assets.md](docs/third-party-assets.md)。
 部署和日常使用见 [docs/client-deployment.md](docs/client-deployment.md)。
 
 ## 打包

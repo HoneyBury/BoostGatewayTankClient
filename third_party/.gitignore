@@ -1,0 +1,7 @@
+# Extracted SDK package content is a local/offline build asset, not source.
+sdk-package/
+
+# Generated distributable archive
+*.zip
+*.tar.gz
+

@@ -29,6 +29,89 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# Separate server-owned imported SDK/package dependencies from client-owned
+# application dependencies so future maintenance does not blur the boundary.
+add_library(bgtc_sdk_deps INTERFACE)
+target_link_libraries(bgtc_sdk_deps
+    INTERFACE
+        boost_gateway::sdk
+)
+
+# TankProtocol consumes nlohmann/json directly, so the client must declare a
+# JSON dependency explicitly instead of relying on accidental transitive SDK
+# include leakage.
+if(TARGET boost_gateway::nlohmann_json)
+    target_link_libraries(bgtc_sdk_deps
+        INTERFACE
+            boost_gateway::nlohmann_json
+    )
+    if(BOOST_GATEWAY_SDK_DIR AND EXISTS "${BOOST_GATEWAY_SDK_DIR}/../../../include/nlohmann/nlohmann/json.hpp")
+        target_include_directories(bgtc_sdk_deps
+            INTERFACE
+                "${BOOST_GATEWAY_SDK_DIR}/../../../include/nlohmann"
+        )
+    endif()
+else()
+    find_package(nlohmann_json CONFIG QUIET)
+    if(TARGET nlohmann_json::nlohmann_json)
+        target_link_libraries(bgtc_sdk_deps
+            INTERFACE
+                nlohmann_json::nlohmann_json
+        )
+    else()
+        set(_bgtc_json_include_candidates)
+        if(BOOST_GATEWAY_SDK_DIR)
+            list(APPEND _bgtc_json_include_candidates
+                "${BOOST_GATEWAY_SDK_DIR}/../../../include"
+                "${BOOST_GATEWAY_SDK_DIR}/../../include"
+                "${BOOST_GATEWAY_SDK_DIR}/../include"
+                "${BOOST_GATEWAY_SDK_DIR}/include"
+            )
+        endif()
+        if(BOOST_GATEWAY_SERVER_BUILD_DIR)
+            list(APPEND _bgtc_json_include_candidates
+                "${BOOST_GATEWAY_SERVER_BUILD_DIR}/_deps/nlohmann_json-src/include"
+                "${BOOST_GATEWAY_SERVER_BUILD_DIR}/../_deps/nlohmann_json-src/include"
+            )
+        endif()
+        if(BOOST_GATEWAY_SERVER_ROOT)
+            list(APPEND _bgtc_json_include_candidates
+                "${BOOST_GATEWAY_SERVER_ROOT}/runtime/sdk-package-prefix/include"
+                "${BOOST_GATEWAY_SERVER_ROOT}/build/_deps/nlohmann_json-src/include"
+                "${BOOST_GATEWAY_SERVER_ROOT}/build/default/_deps/nlohmann_json-src/include"
+                "${BOOST_GATEWAY_SERVER_ROOT}/build/release/_deps/nlohmann_json-src/include"
+            )
+        endif()
+        find_path(BGTC_NLOHMANN_JSON_INCLUDE_DIR
+            nlohmann/json.hpp
+            PATHS ${_bgtc_json_include_candidates}
+            NO_DEFAULT_PATH
+        )
+        if(BGTC_NLOHMANN_JSON_INCLUDE_DIR)
+            get_filename_component(BGTC_NLOHMANN_JSON_INCLUDE_ROOT
+                "${BGTC_NLOHMANN_JSON_INCLUDE_DIR}"
+                DIRECTORY
+            )
+            target_include_directories(bgtc_sdk_deps
+                INTERFACE
+                    "${BGTC_NLOHMANN_JSON_INCLUDE_ROOT}"
+            )
+        else()
+            message(FATAL_ERROR
+                "Could not resolve nlohmann_json for BoostGatewayTankClient. "
+                "Provide it through the BoostGateway SDK package or install a "
+                "standalone nlohmann_json CMake package."
+            )
+        endif()
+    endif()
+endif()
+
+add_library(bgtc_client_ui_deps INTERFACE)
+target_link_libraries(bgtc_client_ui_deps
+    INTERFACE
+        Qt${BGTC_QT_MAJOR}::Widgets
+)
+
 add_executable(boost_gateway_tank_client
     src/app/main.cpp
     src/core/AppConfig.cpp
@@ -73,8 +156,8 @@ target_include_directories(boost_gateway_tank_client
 
 target_link_libraries(boost_gateway_tank_client
     PRIVATE
-        Qt${BGTC_QT_MAJOR}::Widgets
-        boost_gateway::sdk
+        bgtc_client_ui_deps
+        bgtc_sdk_deps
 )
 
 target_compile_definitions(boost_gateway_tank_client
@@ -185,6 +268,7 @@ if(BGTC_BUILD_TESTS)
             "${CMAKE_CURRENT_SOURCE_DIR}/src"
     )
     target_link_libraries(tank_protocol_smoke_test PRIVATE boost_gateway::sdk)
+    target_link_libraries(tank_protocol_smoke_test PRIVATE bgtc_sdk_deps)
     add_test(NAME tank_protocol_smoke_test COMMAND tank_protocol_smoke_test)
 
     add_executable(tank_ui_smoke_test
@@ -219,8 +303,8 @@ if(BGTC_BUILD_TESTS)
     )
     target_link_libraries(tank_ui_smoke_test
         PRIVATE
-            Qt${BGTC_QT_MAJOR}::Widgets
-            boost_gateway::sdk
+            bgtc_client_ui_deps
+            bgtc_sdk_deps
     )
     add_test(NAME tank_ui_smoke_test COMMAND tank_ui_smoke_test)
     set_tests_properties(tank_ui_smoke_test PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
@@ -253,8 +337,8 @@ if(BGTC_BUILD_TESTS)
     )
     target_link_libraries(tank_ui_flow_test
         PRIVATE
-            Qt${BGTC_QT_MAJOR}::Widgets
-            boost_gateway::sdk
+            bgtc_client_ui_deps
+            bgtc_sdk_deps
     )
     add_test(NAME tank_ui_flow_test COMMAND tank_ui_flow_test)
     set_tests_properties(tank_ui_flow_test PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
@@ -271,5 +355,5 @@ if(BGTC_BUILD_HEADLESS)
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/src"
     )
-    target_link_libraries(tank_headless_gate PRIVATE boost_gateway::sdk)
+    target_link_libraries(tank_headless_gate PRIVATE bgtc_sdk_deps)
 endif()

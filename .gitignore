@@ -21,3 +21,7 @@ CMakeLists.txt.user*
 # Local environment overrides
 .env
 local.env
+
+# Third-party client asset bundle and extracted SDK package
+/third_party-client-assets.zip
+/third_party/sdk-package/
